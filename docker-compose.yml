@@ -1,0 +1,16 @@
+# AsterMem Docker deployment: docker compose up -d
+# Data and config are persisted under ./data (including config.yaml); backing up = copying that directory.
+# API keys live in .env (see .env.example). It still starts without them, but semantic search degrades to keyword search.
+services:
+  astermem:
+    build: .
+    image: astermem:latest
+    container_name: astermem
+    ports:
+      - "8768:8768"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

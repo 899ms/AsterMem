@@ -1,0 +1,20 @@
+# Exclude anything irrelevant to the image to keep the build context small and keep credentials out of it
+.git
+.github
+venv
+data
+config.yaml
+config.yaml.bak
+.env
+tests
+scripts
+docs/*
+!docs/methodology
+web-ui/node_modules
+web-ui/dist
+**/__pycache__
+**/*.pyc
+*.tsbuildinfo
+.DS_Store
+Dockerfile
+docker-compose.yml

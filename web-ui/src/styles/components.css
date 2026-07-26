@@ -1,0 +1,754 @@
+/*
+ * Background: Design system component-layer styles, reused site-wide for buttons, forms, cards, tables, modals, toasts.
+ * Design intent: Buttons have thin border + transparent background + hover invert (ink bg with paper text or acid green);
+ * inputs use underline/thin-border style, all zero border-radius, maintaining the brutalist editorial feel.
+ * Key constraint: New pages must not bypass these classes with custom same-type controls.
+ */
+
+/* ---- Buttons ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: color 0.18s ease, background 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.5;
+}
+
+.btn:hover:not(:disabled) {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn.primary {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.btn.primary:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--acid);
+  border-color: var(--ink);
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn.danger:hover:not(:disabled) {
+  color: var(--paper);
+  background: var(--danger);
+}
+
+.btn.small {
+  padding: 5px 10px;
+  font-size: 10px;
+}
+
+.btn.acid {
+  background: var(--acid);
+}
+
+.btn.acid:hover:not(:disabled) {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+/*
+ * Touch sizing: default button actual height is ~36px, below the 44px tap target minimum—
+ * fingertips easily hit neighbors. Only pad up for coarse pointer devices; mouse keeps the
+ * compact editorial layout. The small variant is for inline card actions; padding all the way
+ * to 44 would stretch lists apart, so 34px is the compromise.
+ */
+@media (pointer: coarse) {
+  .btn {
+    min-height: var(--tap);
+    padding: 10px 16px;
+  }
+
+  .btn.small {
+    min-height: 34px;
+  }
+}
+
+/*
+ * Compact button on narrow screens: icon only, text wrapped in .btn-label is hidden together.
+ * Usages must include aria-label, otherwise the button loses its accessible name.
+ */
+@media (max-width: 560px) {
+  .btn-compact {
+    min-width: var(--tap);
+    min-height: var(--tap);
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .btn-compact .btn-label {
+    display: none;
+  }
+}
+
+.button-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.button-tooltip[data-tooltip]:hover::after {
+  position: absolute;
+  z-index: 80;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  width: max-content;
+  max-width: 240px;
+  padding: 7px 9px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  content: attr(data-tooltip);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
+  text-transform: none;
+  white-space: normal;
+}
+
+/* ---- Forms ---- */
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Field note below: keeps muted color but skips mono and uppercase transforms,
+   otherwise a full explanatory sentence becomes an unreadable all-caps label */
+.field > .field-note {
+  font-family: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  background: transparent;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--ink);
+}
+
+.input.mono,
+.textarea.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.select {
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23151613' stroke-width='1.5'%3E%3Cpath d='m7 9 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 13px;
+  cursor: pointer;
+}
+
+/* Themed dropdown (components/Select.tsx): closed state reuses .select,
+   open panel reuses model-picker-dropdown class family */
+.themed-select {
+  position: relative;
+  min-width: 130px;
+}
+
+.themed-select-trigger {
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.themed-select-trigger.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.themed-select-dropdown {
+  min-width: 100%;
+  width: max-content;
+  max-width: 320px;
+}
+
+/* Small variant: same height and font-size as .btn.small, used for side-by-side toolbar scenarios */
+.themed-select.small {
+  min-width: 0;
+}
+
+.themed-select.small .themed-select-trigger {
+  min-height: 0;
+  padding: 5px 26px 5px 10px;
+  border-color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background-position: right 8px center;
+  background-size: 11px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.checkbox-row input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--ink);
+}
+
+/* ---- Cards and panels ---- */
+
+.panel {
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-head.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease;
+}
+
+.panel-head.clickable:hover {
+  background: var(--paper-deep);
+}
+
+.panel-body {
+  padding: 18px;
+}
+
+.card {
+  display: block;
+  width: 100%;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.card.clickable:hover {
+  border-color: var(--ink);
+  background: var(--paper-deep);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.stat-cell {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+}
+
+.stat-cell strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* ---- Tag chip ---- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.chip.clickable {
+  cursor: pointer;
+}
+
+.chip.clickable:hover,
+.chip.active {
+  border-color: var(--ink);
+  background: var(--acid);
+}
+
+.chip button {
+  display: inline-flex;
+  padding: 0;
+  opacity: 0.55;
+}
+
+.chip button:hover {
+  opacity: 1;
+}
+
+.chip button svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/*
+ * Tag input: the outer container is already an input box—adding borders around each tag
+ * would create a box-in-box look. So tokens keep only mono text + delete cross, separated
+ * by spacing; border appears only on hover to hint deletability.
+ */
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  min-height: 40px;
+}
+
+.tag-input > input {
+  flex: 1;
+  min-width: 90px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.tag-input-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tag-input-token button {
+  display: inline-flex;
+  padding: 0;
+  opacity: 0.4;
+}
+
+.tag-input-token:hover button,
+.tag-input-token button:hover {
+  opacity: 1;
+}
+
+.tag-input-token button svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+
+/* ---- Tables ---- */
+
+.table {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ink);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  vertical-align: top;
+}
+
+.table tr.clickable {
+  cursor: pointer;
+}
+
+.table tr.clickable:hover td {
+  background: var(--paper-deep);
+}
+
+/* ---- Tabs ---- */
+
+/*
+ * Horizontal scroll instead of wrapping: Profile has four tabs, graph has three—on narrow screens
+ * wrapping pushes content below and breaks the visual association between tab rows and content area.
+ * The scrollbar itself is hidden; overflowing tabs peek out half-visible to hint scrollability.
+ * On desktop there's no overflow, so the overflow property has no visual effect.
+ */
+.tabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs button {
+  padding: 11px 18px;
+  margin-bottom: -1px;
+  flex: none;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tabs button:hover {
+  color: var(--ink);
+}
+
+.tabs button.active {
+  border-color: var(--line);
+  border-bottom-color: var(--paper);
+  color: var(--ink);
+  background: var(--paper);
+}
+
+/* ---- Modals ---- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(21, 22, 19, 0.4);
+}
+
+.modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 86vh;
+  /* Mobile browser address bar changes visible height; vh uses collapsed state, so modal bottom gets clipped */
+  max-height: 86dvh;
+  overflow-y: auto;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 10px 10px 0 rgba(21, 22, 19, 0.85);
+}
+
+.modal.wide {
+  max-width: 860px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-body {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- Toast ---- */
+
+.toast-host {
+  position: fixed;
+  z-index: 300;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  gap: 8px;
+  max-width: 380px;
+}
+
+/* Narrow screens: 380px fixed width overflows the screen; switch to side margins and raise above the bottom tab bar */
+@media (max-width: 560px) {
+  .toast-host {
+    right: 12px;
+    bottom: calc(var(--tabbar-h) + 12px);
+    left: 12px;
+    max-width: none;
+  }
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 6px 6px 0 rgba(21, 22, 19, 0.85);
+  font-size: 13px;
+  animation: toast-in 0.18s ease;
+}
+
+.toast.error {
+  border-color: var(--danger);
+  box-shadow: 6px 6px 0 rgba(162, 47, 47, 0.7);
+}
+
+.toast.success {
+  background: var(--acid);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- Empty state / Loading ---- */
+
+.empty-state {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 60px 20px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-state svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 1.2;
+  opacity: 0.5;
+}
+
+.loading-line {
+  padding: 40px 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---- Pagination ---- */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* ---- Markdown rendering ---- */
+
+.md-body {
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  margin: 1.4em 0 0.5em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.md-body h1 {
+  font-size: 26px;
+}
+
+.md-body h2 {
+  font-size: 21px;
+}
+
+.md-body h3 {
+  font-size: 17px;
+}
+
+.md-body p,
+.md-body ul,
+.md-body ol,
+.md-body blockquote,
+.md-body table {
+  margin: 0.7em 0;
+}
+
+.md-body ul,
+.md-body ol {
+  padding-left: 1.5em;
+}
+
+.md-body code {
+  padding: 1px 5px;
+  background: var(--paper-deep);
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+.md-body pre {
+  margin: 0.9em 0;
+  padding: 14px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+.md-body pre code {
+  padding: 0;
+  background: none;
+}
+
+.md-body blockquote {
+  padding: 4px 16px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.md-body a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.md-body a:hover {
+  background: var(--acid);
+}
+
+.md-body table {
+  border-collapse: collapse;
+}
+
+.md-body th,
+.md-body td {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.md-body img {
+  max-width: 100%;
+}
+
+.md-body hr {
+  margin: 1.4em 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}

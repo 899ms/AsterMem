@@ -93,18 +93,21 @@ def seed_demo_library(sync_manager, database) -> Optional[int]:
     from memory.auth import add_sample_memories
 
     try:
-        if database.list_memories(limit=1):
-            return None
+        already_populated = bool(database.list_memories(limit=1))
     except Exception as exc:  # noqa: BLE001 - seeding must never block startup
         print(f"[demo] Could not inspect existing memories, skipping seed: {exc}")
         return None
 
-    try:
-        count = add_sample_memories(sync_manager, lang="en")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[demo] Failed to seed sample memories: {exc}")
-        return None
+    count = None
+    if not already_populated:
+        try:
+            count = add_sample_memories(sync_manager, lang="en")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[demo] Failed to seed sample memories: {exc}")
+            return None
 
+    # Runs even when the memories were already there: tmpfs survives a service restart, so a
+    # redeploy finds a populated store and would otherwise never backfill the graph.
     _seed_graph_when_chunked(database)
     return count
 

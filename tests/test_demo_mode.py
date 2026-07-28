@@ -170,6 +170,30 @@ def test_demo_graph_is_grounded_in_the_sample_library():
         assert source in sample_titles, f"event cites a non-existent memory: {source}"
 
 
+def test_demo_graph_seeding_is_idempotent():
+    """
+    Demo storage is a tmpfs that outlives a service restart, so seeding meets a populated store on
+    every redeploy. Relations and events are inserted without dedup, so a second pass would
+    multiply every edge in the graph.
+    """
+    from memory.demo_graph import seed_demo_graph
+
+    class PopulatedStore:
+        def get_all_entities(self, limit=100):
+            return [{"id": 1, "name": "Alex"}]
+
+        def upsert_entity(self, *args, **kwargs):
+            raise AssertionError("must not write into a store that already has a graph")
+
+        def add_entity_relation(self, *args, **kwargs):
+            raise AssertionError("must not write into a store that already has a graph")
+
+        def add_time_event(self, *args, **kwargs):
+            raise AssertionError("must not write into a store that already has a graph")
+
+    assert "skipped" in seed_demo_graph(PopulatedStore())
+
+
 def test_demo_mode_yields_no_chat_model(monkeypatch):
     """
     Every LLM caller goes through get_chat_model, so returning None there is what guarantees a

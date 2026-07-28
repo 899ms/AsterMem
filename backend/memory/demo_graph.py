@@ -144,9 +144,12 @@ def seed_demo_graph(database) -> dict:
     """
     Insert the hand-written graph for the sample library.
 
-    Returns counts of what was written. Safe to call only on a freshly seeded store: entity
-    upserts are keyed by name, but relations and events are not deduplicated.
+    A no-op when entities already exist. Relations and events are not deduplicated on write, so
+    re-running on a populated store would multiply every edge on each service restart.
     """
+    if database.get_all_entities(limit=1):
+        return {"skipped": "graph already present"}
+
     trunk_by_title = _first_trunk_by_title(database)
     if not trunk_by_title:
         return {"entities": 0, "relations": 0, "events": 0}

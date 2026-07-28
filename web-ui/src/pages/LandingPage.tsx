@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { IconArrowRight, IconBrandGithub } from "@tabler/icons-react";
 import { LocaleSwitcher, useI18n } from "../i18n";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "../license";
+import { LandingStory } from "./landing/LandingStory";
 
 export function LandingPage() {
   const { t } = useI18n();
@@ -53,7 +54,7 @@ export function LandingPage() {
           <div className="landing-hero-copy">
             <span className="kicker">{t("Self-hosted · AI-ready · Private")}</span>
             <h1>{t("Turn scattered information into memory you can recall.")}</h1>
-            <p>{t("AsterMem runs on your own machine. Bring in notes, files, and conversations. Search them, ask AI, or map the connections. You control the data and the models.")}</p>
+            <p>{t("AsterMem runs on your own machine. Bring in material, files, and conversations. Search them, ask AI, or map the connections. You control the data and the models.")}</p>
             <div className="landing-actions">
               <Link to="/home" className="btn primary">
                 {t("Get started")}
@@ -91,11 +92,13 @@ export function LandingPage() {
         <section className="landing-manifesto">
           <span className="kicker">{t("Why AsterMem")}</span>
           <div className="landing-manifesto-copy">
-            <p>{t("Notes capture it.")}</p>
+            <p>{t("Capturing it is the easy part.")}</p>
             <p>{t("AsterMem brings it back. AI puts it to work.")}</p>
             <p>{t("No more digging through folders and hoping.")}</p>
           </div>
         </section>
+
+        <LandingStory />
 
         <section className="landing-methodology">
           <div className="landing-methodology-meta">
@@ -159,6 +162,15 @@ export function LandingPage() {
               <p>{t("Use search, AI exploration, or graphs. Pull back the exact context you need.")}</p>
             </article>
           </div>
+        </section>
+
+        {/* Reuses the privacy band layout: same two-column slab, different message. */}
+        <section className="landing-privacy">
+          <div>
+            <span className="kicker">{t("Built for AI agents")}</span>
+            <h2>{t("One brain, shared by every AI app you use")}</h2>
+          </div>
+          <p>{t("Claude Code, Codex, Cursor, and nearly every other agent app connect through a single Skill. They all read and write the same memory library, so teach one agent something and the rest remember it too.")}</p>
         </section>
 
         <section className="landing-privacy">

@@ -363,6 +363,33 @@
   font-size: 10px;
 }
 
+/* The deploy slab sits right below the Skill slab and tells a different story (SSH to a server,
+   not this instance's API), so it is inverted: ink on paper above, paper on ink below. */
+.ai-handoff.deploy {
+  margin-top: 40px;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 12px 12px 0 var(--acid);
+}
+
+.ai-handoff.deploy .kicker,
+.ai-handoff.deploy > p {
+  color: rgba(241, 239, 232, 0.72);
+}
+
+/* Buttons are drawn for a paper background; on ink they need paper borders and an acid hover. */
+.ai-handoff.deploy .btn.primary {
+  color: var(--ink);
+  background: var(--acid);
+  border-color: var(--acid);
+}
+
+.ai-handoff.deploy .btn.primary:hover:not(:disabled) {
+  color: var(--acid);
+  background: transparent;
+  border-color: var(--acid);
+}
+
 .ai-handoff-token {
   margin-top: 4px;
   max-width: 560px;
@@ -1929,6 +1956,58 @@
   background: var(--acid);
 }
 
+/* The self-hosting banner is the primary call to action, so the contact block is inverted rather
+   than a second slab of acid green competing with it for the same attention. */
+.home-ai-banner.contact {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.home-ai-banner.contact .kicker,
+.home-ai-banner.contact p {
+  color: rgba(241, 239, 232, 0.72);
+}
+
+/* The shared link style uppercases its label, which is fine for "SOURCE CODE" but rewrites a
+   handle people have to type back. */
+.home-ai-banner.contact .home-ai-banner-link {
+  color: var(--acid);
+  text-transform: none;
+  font-size: 13px;
+}
+
+/* The hover nudge reads as "go on" for a trailing arrow; on a leading brand mark it just slides
+   the logo into the handle. */
+.home-ai-banner.contact:hover .home-ai-banner-link svg {
+  transform: none;
+}
+
+/* The deploy banner is a <button> (it copies a brief instead of navigating) and sits right under
+   the acid Skill banner, so it is inverted for the same reason as .contact: one call to action
+   per color. Button resets keep the shared grid layout intact. */
+button.home-ai-banner.deploy {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.home-ai-banner.deploy .kicker,
+.home-ai-banner.deploy p {
+  color: rgba(241, 239, 232, 0.72);
+}
+
+.home-ai-banner.deploy .home-ai-banner-link {
+  color: var(--acid);
+}
+
+/* A copy icon does not "go somewhere", so it keeps still on hover. */
+.home-ai-banner.deploy:hover .home-ai-banner-link svg {
+  transform: none;
+}
+
 .home-ai-banner h2 {
   margin-bottom: 5px;
   font-size: 22px;
@@ -2027,7 +2106,9 @@
 .landing-page {
   min-height: 100vh;
   min-height: 100dvh;
-  overflow: hidden;
+  /* clip (not hidden): hidden would make this a scroll container and kill the
+     position:sticky pinning of the scroll story; clip crops the same without that. */
+  overflow: clip;
   background: var(--paper);
 }
 
@@ -2450,6 +2531,854 @@
   color: var(--muted);
   font-size: 16px;
   line-height: 1.8;
+}
+
+/* ==================== Landing scroll story (the life of one memory) ==================== */
+
+/* The section is 5 viewport-heights taller than the scene: that surplus is the "film length".
+   The inner sticky element pins the scene while scroll progress (--p, set from JS) advances
+   the acts. All motion is transform/opacity only. */
+.landing-story {
+  position: relative;
+  height: 540vh;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.landing-story-sticky {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100svh;
+  padding: 18px clamp(20px, 5vw, 84px) 14px;
+  overflow: hidden;
+}
+
+/* Drifting "+" marks: each has its own parallax speed, driven directly by --p every frame. */
+.story-drift {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  color: rgba(241, 239, 232, 0.16);
+  font-family: var(--mono);
+  font-size: 20px;
+}
+
+.story-drift span { position: absolute; }
+.story-drift span:nth-child(1) { left: 7%;  top: 36%; transform: translateY(calc(var(--p, 0) * -180px)); }
+.story-drift span:nth-child(2) { left: 31%; top: 84%; transform: translateY(calc(var(--p, 0) * -320px)); }
+.story-drift span:nth-child(3) { left: 55%; top: 20%; transform: translateY(calc(var(--p, 0) * -120px)); }
+.story-drift span:nth-child(4) { left: 72%; top: 74%; transform: translateY(calc(var(--p, 0) * -260px)); }
+.story-drift span:nth-child(5) { left: 90%; top: 44%; transform: translateY(calc(var(--p, 0) * -200px)); }
+.story-drift span:nth-child(6) { left: 17%; top: 62%; transform: translateY(calc(var(--p, 0) * -90px)); }
+
+.story-head {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(241, 239, 232, 0.2);
+}
+
+.story-head .kicker { color: var(--acid); }
+
+.story-head h2 {
+  font-size: clamp(20px, 2.6vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.story-hint {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(241, 239, 232, 0.55);
+}
+
+/* Scroll progress underlines the header, scaleX driven by --p. */
+.story-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: rgba(241, 239, 232, 0.15);
+}
+
+.story-progress i {
+  display: block;
+  height: 100%;
+  background: var(--acid);
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
+}
+
+/* Copy band on top, assembly line underneath: the line needs the full width to read as a path. */
+.story-main {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vh, 34px);
+  flex: 1;
+  min-height: 0;
+}
+
+/* Copy blocks are stacked absolutely and swap as the act changes. */
+.story-copy-col {
+  position: relative;
+  height: clamp(120px, 21vh, 190px);
+  flex: none;
+}
+
+.story-copy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 400px);
+  align-content: end;
+  gap: 4px clamp(20px, 4vw, 56px);
+  opacity: 0;
+  transform: translateY(40px) skewY(1.2deg);
+  transition: opacity 0.45s ease, transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+.story-copy.active {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.08s;
+}
+
+.story-copy em {
+  grid-column: 1;
+  justify-self: start;
+  padding: 3px 10px;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--acid);
+  color: var(--ink);
+}
+
+.story-copy h3 {
+  grid-column: 1;
+  font-size: clamp(34px, 5vw, 76px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.98;
+}
+
+.story-copy p {
+  grid-column: 2;
+  align-self: end;
+  padding-bottom: 6px;
+  color: rgba(241, 239, 232, 0.78);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+/* ---- The stage: a left-to-right data path. Stations are laid out in flow, so nothing ever
+   has to be removed to make room. The stage-N class only changes which one is lit. ---- */
+.story-visual {
+  position: relative;
+  display: grid;
+  place-items: stretch;
+  flex: 1;
+  min-height: 0;
+  /* Clearance so the act 5 vault frame never crosses into the act rail below. */
+  padding-bottom: 18px;
+}
+
+/* Spotlight sliding along the line onto the active station. */
+.story-beam {
+  position: absolute;
+  z-index: 0;
+  top: -14%;
+  bottom: -14%;
+  left: 10%;
+  width: 30%;
+  background: radial-gradient(closest-side, rgba(201, 255, 71, 0.19), transparent 78%);
+  transform: translateX(-50%);
+  transition: left 0.7s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.7s ease;
+  animation: story-beam-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes story-beam-breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.stage-0 .story-beam { left: 10%; }
+.stage-1 .story-beam { left: 51%; }
+.stage-2 .story-beam { left: 71%; }
+.stage-3 .story-beam { left: 91%; }
+.stage-4 .story-beam { left: 50%; width: 108%; }
+
+/* ---- Ghost layers: barely-there paper tones that fill the dark stage with hints of content.
+   They sit behind everything, drift slightly with scroll, and never compete with the lead. ---- */
+.story-ghost-num {
+  position: absolute;
+  z-index: 0;
+  right: -2%;
+  bottom: -6%;
+  width: 1.2em;
+  height: 1em;
+  font-family: var(--mono);
+  font-size: clamp(180px, 38vh, 330px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: rgba(241, 239, 232, 0.05);
+  transform: translateY(calc(var(--p, 0) * -50px));
+}
+
+.story-ghost-num span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.stage-0 .story-ghost-num span:nth-child(1),
+.stage-1 .story-ghost-num span:nth-child(2),
+.stage-2 .story-ghost-num span:nth-child(3),
+.stage-3 .story-ghost-num span:nth-child(4),
+.stage-4 .story-ghost-num span:nth-child(5) { opacity: 1; }
+
+/* ---- The assembly line, running left to right ---- */
+/* Full-height bays: the line reads as a machine with five stations rather than a thin strip. */
+.story-pipe {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  transform: translateX(calc(var(--p, 0) * -22px)) scale(var(--pipe-scale, 1));
+}
+
+/* Stations swing in hard, then settle; once passed they stay as dimmed context. */
+.story-node {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 9px 18px;
+  gap: 10px;
+  opacity: 0.1;
+  transform: translateY(52px) scale(0.86) rotate(-2deg);
+  transition: opacity 0.45s ease, transform 0.75s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+/* The source bay carries an eight-tile roster, so it needs more room than the rest. */
+.story-node.act0 { flex: 1.15 1 0; }
+
+.story-node.is-live { opacity: 1; transform: scale(1.03); }
+.story-node.is-past { opacity: 0.34; transform: none; }
+
+/* Inside the vault the whole path lights back up: all of this lives on your machine. */
+.stage-4 .story-node.is-past { opacity: 0.8; }
+
+/* The bay itself: a tall panel that floods with acid light when its act is on. */
+.story-node::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 -3px;
+  border: 1px solid rgba(241, 239, 232, 0.08);
+  background: linear-gradient(180deg, rgba(241, 239, 232, 0.03), transparent 60%);
+  transition: border-color 0.45s ease, background 0.45s ease, box-shadow 0.45s ease;
+}
+
+.story-node.is-live::before {
+  border-color: rgba(201, 255, 71, 0.5);
+  background: linear-gradient(180deg, rgba(201, 255, 71, 0.13), rgba(201, 255, 71, 0.02) 70%);
+  animation: story-halo 2.2s ease-in-out infinite;
+}
+
+@keyframes story-halo {
+  0%, 100% { box-shadow: inset 0 0 0 rgba(201, 255, 71, 0); }
+  50% { box-shadow: inset 0 0 60px rgba(201, 255, 71, 0.16); }
+}
+
+/* Ceiling lamp over the live bay */
+.story-node::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  background: var(--acid);
+  box-shadow: 0 0 22px rgba(201, 255, 71, 0.9);
+  transform: translateX(-50%);
+  transition: width 0.5s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.story-node.is-live::after { width: 100%; }
+
+/* Station sign stays pinned at the top of every bay so all five line up. */
+.story-bay {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+}
+
+/* Station label: a plate that flips to acid the moment its act starts. */
+.story-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border: 1px solid rgba(241, 239, 232, 0.35);
+  color: rgba(241, 239, 232, 0.6);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
+}
+
+.story-node.is-live .story-step {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+}
+
+/* Acid means "acting now", so the memory's own tag is paper instead. */
+.story-step.lit {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink);
+}
+
+.story-node.is-live .story-step::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: story-blink 1s steps(1) infinite;
+}
+
+@keyframes story-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.15; }
+}
+
+/* Link between stations: marching ants carrying a packet from left to right. */
+.story-wire {
+  position: relative;
+  align-self: center;
+  flex: 0 0 clamp(16px, 3vw, 58px);
+  height: 2px;
+  opacity: 0.12;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(241, 239, 232, 0.55) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 12px 2px;
+  transition: opacity 0.5s ease;
+  animation: story-march 0.5s linear infinite;
+}
+
+.story-wire.is-live,
+.story-wire.is-past { opacity: 1; }
+
+.story-wire.is-live {
+  background-image: repeating-linear-gradient(90deg, var(--acid) 0 6px, transparent 6px 12px);
+}
+
+@keyframes story-march {
+  to { background-position: 12px 0; }
+}
+
+/* The packet itself, with a comet trail behind it. */
+.story-wire i {
+  position: absolute;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 16px rgba(201, 255, 71, 0.9), -14px 0 14px -6px rgba(201, 255, 71, 0.6);
+  animation: story-packet 1.3s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+@keyframes story-packet {
+  0% { left: -6px; opacity: 0; transform: scale(0.5); }
+  18% { opacity: 1; transform: scale(1.25); }
+  82% { opacity: 1; transform: scale(1); }
+  100% { left: calc(100% - 4px); opacity: 0; transform: scale(0.5); }
+}
+
+/* The one memory the whole story is about — always full strength, never dimmed. */
+.story-hero {
+  flex: 1.5 1 0;
+  z-index: 3;
+  opacity: 1;
+  transform: none;
+}
+
+/* No bay frame or lamp here: the memory is riding the line, not a station on it. Only the
+   acting station is ever framed, so an act never reads as two acts at once. */
+.story-hero::before,
+.story-hero::after { display: none; }
+
+.story-card {
+  position: relative;
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 18px 19px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 11px 11px 0 var(--acid);
+  animation: story-hero-float 4.6s ease-in-out infinite;
+}
+
+@keyframes story-hero-float {
+  0%, 100% { transform: translateY(0) rotate(-0.7deg); box-shadow: 11px 11px 0 var(--acid); }
+  50% { transform: translateY(-9px) rotate(0.7deg); box-shadow: 15px 17px 0 var(--acid); }
+}
+
+.story-card > span {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.story-card strong {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.story-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.story-card-tags em {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--ink);
+}
+
+/* Station 1: the agent apps that feed AsterMem, and the raw line one of them just heard. */
+/* Four-up, two rows: a deliberate roster instead of whatever the width happens to allow. */
+.story-apps {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 7px;
+  justify-content: center;
+}
+
+.story-app {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  animation: story-app-bob 3.4s ease-in-out infinite;
+}
+
+.story-app:nth-child(2) { animation-delay: 0.15s; }
+.story-app:nth-child(3) { animation-delay: 0.3s; }
+.story-app:nth-child(4) { animation-delay: 0.45s; }
+.story-app:nth-child(5) { animation-delay: 0.6s; }
+.story-app:nth-child(6) { animation-delay: 0.75s; }
+.story-app:nth-child(7) { animation-delay: 0.9s; }
+.story-app:nth-child(8) { animation-delay: 1.05s; }
+
+@keyframes story-app-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.story-app img { width: 22px; height: 22px; }
+
+.story-apps-caption {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  color: rgba(241, 239, 232, 0.5);
+  text-align: center;
+}
+
+.story-snippet {
+  position: relative;
+  width: 100%;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px dashed var(--acid);
+  color: var(--paper);
+  box-shadow: 0 0 60px rgba(201, 255, 71, 0.14);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* Light sweep: a beam repeatedly scans across the raw snippet while act 1 is on stage,
+   pulling the eye to the piece of information about to become a memory. */
+.story-snippet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 22%,
+    rgba(201, 255, 71, 0.34) 46%,
+    rgba(241, 239, 232, 0.24) 53%,
+    transparent 78%
+  );
+  transform: translateX(-130%);
+}
+
+.story-snippet::after {
+  animation: story-sweep 2.8s cubic-bezier(0.45, 0, 0.25, 1) 0.5s infinite;
+}
+
+@keyframes story-sweep {
+  0% { transform: translateX(-130%); }
+  55%, 100% { transform: translateX(130%); }
+}
+
+/* Station 2: where it physically lands. */
+.story-disk {
+  position: relative;
+  width: 100%;
+  padding: 14px 10px 11px;
+  border: 1px solid rgba(241, 239, 232, 0.5);
+}
+
+.story-disk-tab {
+  position: absolute;
+  top: -11px;
+  left: 12px;
+  padding: 3px 9px;
+  background: var(--acid);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.story-files { display: grid; gap: 9px; }
+
+.story-files span {
+  padding: 8px 9px;
+  border: 1px solid rgba(241, 239, 232, 0.35);
+  color: rgba(241, 239, 232, 0.88);
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Station 3: the same memory, taken apart into chunks and vectors. */
+.story-chunks { display: grid; gap: 9px; width: 100%; }
+
+.story-chunk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid var(--paper);
+  background: rgba(241, 239, 232, 0.04);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+
+.story-chunk i { font-style: normal; color: var(--acid); transition: color 0.4s ease; }
+
+/* On recall the matching chunk is the one that lights up — the rest stay in place. */
+.stage-3 .story-chunk:nth-child(2),
+.stage-4 .story-chunk:nth-child(2) {
+  background: var(--acid);
+  border-color: var(--acid);
+  color: var(--ink);
+  animation: story-match 1.6s ease-in-out infinite;
+}
+
+.stage-3 .story-chunk:nth-child(2) i,
+.stage-4 .story-chunk:nth-child(2) i { color: var(--ink); }
+
+@keyframes story-match {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(201, 255, 71, 0); }
+  50% { transform: scale(1.06); box-shadow: 0 0 30px rgba(201, 255, 71, 0.55); }
+}
+
+.story-vector {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  text-align: center;
+  color: var(--acid);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.story-vector .ghost {
+  color: rgba(201, 255, 71, 0.26);
+  font-size: 10px;
+}
+
+/* Station 4: the question, the score, the paragraph that comes back. */
+.story-recall-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+
+.story-query {
+  padding: 10px 13px;
+  border: 1px solid var(--paper);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: center;
+}
+
+.story-score {
+  padding: 5px 10px;
+  background: var(--acid);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  animation: story-blink-soft 1.4s ease-in-out infinite;
+}
+
+@keyframes story-blink-soft {
+  0%, 100% { box-shadow: 0 0 0 rgba(201, 255, 71, 0); }
+  50% { box-shadow: 0 0 22px rgba(201, 255, 71, 0.75); }
+}
+
+.story-answer {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 15px 16px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 9px 9px 0 var(--acid);
+}
+
+.story-answer span {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.story-answer p {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Station 5: the vault slams shut around the entire line built up so far. */
+.story-vault {
+  position: absolute;
+  inset: -12px -14px;
+  pointer-events: none;
+  border: 2px solid rgba(241, 239, 232, 0.85);
+  outline: 1px solid var(--acid);
+  outline-offset: 7px;
+  opacity: 0;
+  transform: scale(1.14);
+  transition: opacity 0.35s ease, transform 0.6s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.story-vault.is-live { opacity: 1; transform: none; }
+
+/* Corner labels sit on the vault line, cutting into it like plate markings. */
+.story-vault em {
+  position: absolute;
+  padding: 2px 8px;
+  background: var(--ink);
+  color: var(--acid);
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.3, 1.7, 0.5, 1);
+}
+
+.story-vault.is-live em { opacity: 1; transform: none; }
+.story-vault.is-live .tr { transition-delay: 0.1s; }
+.story-vault.is-live .bl { transition-delay: 0.2s; }
+.story-vault.is-live .br { transition-delay: 0.3s; }
+
+.story-vault .tl { top: -10px; left: 16px; }
+.story-vault .tr { top: -10px; right: 16px; }
+.story-vault .bl { bottom: -10px; left: 16px; }
+.story-vault .br { bottom: -10px; right: 16px; }
+
+/* Act rail: which chapter of the story you are in. */
+.story-rail {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(241, 239, 232, 0.2);
+}
+
+.story-rail span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(241, 239, 232, 0.45);
+  transition: color 0.3s ease;
+}
+
+.story-rail span i {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+}
+
+.story-rail span.active { color: var(--acid); }
+
+.story-rail span.active i {
+  background: var(--acid);
+  border-color: var(--acid);
+}
+
+/* The whole line has to fit one screen: on short viewports scale it down rather than clip it. */
+@media (max-height: 820px) { .story-pipe { --pipe-scale: 0.94; } }
+@media (max-height: 720px) { .story-pipe { --pipe-scale: 0.86; } }
+@media (max-height: 640px) { .story-pipe { --pipe-scale: 0.76; } }
+
+@media (max-width: 1240px) {
+  .story-apps-caption { display: none; }
+}
+
+/* Below tablet width five columns stop working: the line turns back into a stack. */
+@media (max-width: 900px) {
+  .story-copy-col { height: 150px; }
+
+  .story-copy {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  .story-copy h3 { font-size: 30px; }
+
+  .story-copy p { grid-column: 1; padding-bottom: 0; font-size: 13px; }
+
+  .story-hint,
+  .story-snippet,
+  .story-vector,
+  .story-drift,
+  .story-ghost-num { display: none; }
+
+  /* Five bays cannot fit side by side or stacked, so the phone shows the memory itself plus
+     whichever station is currently acting on it; the rest wait their turn in the same slot. */
+  .story-pipe {
+    display: grid;
+    grid-template-areas: "hero" "link" "act";
+    grid-template-rows: auto 26px minmax(0, 1fr);
+    justify-items: center;
+    gap: 0;
+    width: min(100%, 360px);
+    margin: 0 auto;
+    transform: scale(var(--pipe-scale, 1));
+  }
+
+  .story-hero { grid-area: hero; }
+
+  .story-node:not(.story-hero) {
+    grid-area: act;
+    width: 100%;
+    align-self: start;
+  }
+
+  .story-node:not(.story-hero):not(.is-live) { opacity: 0; pointer-events: none; }
+
+  /* Act 5 has no station of its own, so recall stays on screen inside the vault. */
+  .stage-4 .story-node.act3 { opacity: 0.8; }
+
+  .story-node::after { display: none; }
+
+  .story-wire {
+    grid-area: link;
+    align-self: center;
+    justify-self: center;
+    width: 2px;
+    height: 22px;
+    background-image: repeating-linear-gradient(
+      180deg,
+      rgba(241, 239, 232, 0.55) 0 6px,
+      transparent 6px 12px
+    );
+    background-size: 2px 12px;
+    animation-name: story-march-v;
+  }
+
+  .story-wire.is-live {
+    background-image: repeating-linear-gradient(180deg, var(--acid) 0 6px, transparent 6px 12px);
+  }
+
+  .story-wire:not(.is-live) { opacity: 0; }
+
+  .story-wire i { animation-name: story-packet-v; }
+
+  .story-rail { flex-wrap: wrap; gap: 10px; }
+}
+
+@keyframes story-march-v {
+  to { background-position: 0 12px; }
+}
+
+@keyframes story-packet-v {
+  0% { top: -6px; left: -4px; opacity: 0; transform: scale(0.5); }
+  18% { opacity: 1; transform: scale(1.25); }
+  82% { opacity: 1; transform: scale(1); }
+  100% { top: calc(100% - 4px); left: -4px; opacity: 0; transform: scale(0.5); }
+}
+
+/* Reduced motion: acts still switch with scroll, but they cut instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-story *,
+  .landing-story *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .landing-final-cta {

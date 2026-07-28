@@ -12,12 +12,13 @@
  */
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { IconBrandGithub, IconX } from "@tabler/icons-react";
+import { IconBrandGithub, IconBrandX, IconX } from "@tabler/icons-react";
 import { LocaleSwitcher, useI18n } from "../i18n";
 import { api, reportError } from "../api";
 import { useAuthSnapshot } from "../authState";
-import { SOURCE_URL } from "../license";
+import { SOURCE_URL, X_HANDLE, X_URL } from "../license";
 import { MobileTabBar } from "./MobileTabBar";
+import { DemoBadge } from "./DemoBadge";
 
 type NavEntry = { to: string; label: string; end?: boolean } | { group: string };
 
@@ -162,17 +163,30 @@ export function Layout({ title, actions, toolbar, fill, children }: {
             <em>{navIndex(currentLinkIndex)}</em>
             {t(navLinks[currentLinkIndex]?.label ?? "Home")}
           </span>
-          <a
-            className="topbar-icon"
-            href={SOURCE_URL}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t("Source code")}
-            title={t("Source code")}
-          >
-            <IconBrandGithub aria-hidden="true" />
-          </a>
-          <LocaleSwitcher />
+          <div className="topbar-right">
+            {demoMode && <DemoBadge />}
+            <a
+              className="topbar-icon"
+              href={SOURCE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t("Source code")}
+              title={t("Source code")}
+            >
+              <IconBrandGithub aria-hidden="true" />
+            </a>
+            <a
+              className="topbar-icon"
+              href={X_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t("Questions? {handle} on X", { handle: X_HANDLE })}
+              title={t("Questions? {handle} on X", { handle: X_HANDLE })}
+            >
+              <IconBrandX aria-hidden="true" />
+            </a>
+            <LocaleSwitcher />
+          </div>
         </header>
         <main className={fill ? "page-body page-body-fill" : "page-body"}>
           {/* Scroll container fills full width (scrollbar hugs the right edge); max-width is handled by page-inner and centered */}

@@ -210,6 +210,50 @@ def test_demo_graph_seeding_is_idempotent():
     assert "skipped" in seed_demo_graph(PopulatedStore())
 
 
+def test_demo_profile_is_grounded_in_the_sample_library():
+    """
+    The profile is hand-written because distillation is off, so nothing checks it at runtime. A
+    claim citing a memory that does not exist would be dropped silently, and a field outside the
+    schema would be rejected the moment a visitor tried to save it.
+    """
+    from memory.auth import SAMPLE_MEMORIES_EN
+    from memory.demo_profile import DEMO_CLAIMS, DEMO_FIELDS, DEMO_MANUAL
+    from memory.profile import FIELD_SCHEMA
+
+    schema_keys = {field["key"] for field in FIELD_SCHEMA}
+    sample_titles = {sample["title"] for sample in SAMPLE_MEMORIES_EN}
+    required = {field["key"] for field in FIELD_SCHEMA if field["required"]}
+
+    assert set(DEMO_FIELDS) <= schema_keys, "field is not in the profile schema"
+    assert required <= set(DEMO_FIELDS), "a required field would still show as missing"
+    assert DEMO_MANUAL.strip()
+
+    for tier, text, titles, confidence in DEMO_CLAIMS:
+        assert tier in {"core", "recent", "map"}, f"unknown tier {tier}"
+        assert text.strip()
+        assert 0 < confidence <= 1
+        assert titles, "a claim with no source cannot be traced back"
+        for title in titles:
+            assert title in sample_titles, f"claim cites a non-existent memory: {title}"
+
+
+def test_demo_profile_seeding_is_idempotent():
+    """Demo storage survives a restart, and claims are inserted without dedup."""
+    from memory.demo_profile import seed_demo_profile
+
+    class PopulatedProfile:
+        def get_fields(self):
+            return {"values": {"nickname": "Alex"}}
+
+        def _set_field(self, *args, **kwargs):
+            raise AssertionError("must not rewrite a profile that already exists")
+
+        def update_manual(self, *args, **kwargs):
+            raise AssertionError("must not overwrite the intro")
+
+    assert "skipped" in seed_demo_profile(PopulatedProfile(), database=None)
+
+
 def test_demo_mode_yields_no_chat_model(monkeypatch):
     """
     Every LLM caller goes through get_chat_model, so returning None there is what guarantees a

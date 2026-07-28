@@ -20,6 +20,7 @@ import { Select } from "../components/Select";
 import { api, reportError } from "../api";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
+import { useAuthSnapshot } from "../authState";
 import type {
   DreamDiff, DreamItem, ProfileClaim, ProfileFieldHistoryItem, ProfileFields,
   ProfileStatus,
@@ -63,6 +64,7 @@ function SourceLinks({ claim }: { claim: ProfileClaim }) {
 
 export function ProfilePage() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const [tab, setTab] = useState("overview");
   const [status, setStatus] = useState<ProfileStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -396,13 +398,17 @@ export function ProfilePage() {
                 <span className="kicker">{t("Profile engine")}</span>
               </div>
               <div className="panel-body" style={{ display: "grid", gap: 14 }}>
-                <label className="checkbox-row">
-                  <input type="checkbox" checked={enabled} disabled={busy === "toggle"}
-                         onChange={() => void toggleEnabled()} />
-                  <span>{t("Enable AI profile distillation")}</span>
-                </label>
+                {!demoMode && (
+                  <label className="checkbox-row">
+                    <input type="checkbox" checked={enabled} disabled={busy === "toggle"}
+                           onChange={() => void toggleEnabled()} />
+                    <span>{t("Enable AI profile distillation")}</span>
+                  </label>
+                )}
                 <p className="muted">
-                  {t("The AI distills your memories into profile claims. Every claim is traceable to its source memory and reviewed before it appears. You can edit or disable everything here.")}
+                  {demoMode
+                    ? t("The AI distills your memories into profile claims, each traceable to the memory it came from. The profile below was distilled from the sample library; the demo runs without a language model, so it cannot distill anything new.")
+                    : t("The AI distills your memories into profile claims. Every claim is traceable to its source memory and reviewed before it appears. You can edit or disable everything here.")}
                 </p>
                 {status && (
                   <div className="stat-grid">
@@ -426,16 +432,18 @@ export function ProfilePage() {
                     </div>
                   </div>
                 )}
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button className="btn" disabled={!enabled || busy === "distill"}
-                          onClick={() => void runDistill()}>
-                    <IconPlayerPlay size={16} aria-hidden="true" /> {t("Distill today now")}
-                  </button>
-                  <button className="btn" disabled={!enabled || busy === "audit"}
-                          onClick={() => void runAudit()}>
-                    <IconRefresh size={16} aria-hidden="true" /> {t("Run audit now")}
-                  </button>
-                </div>
+                {!demoMode && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button className="btn" disabled={!enabled || busy === "distill"}
+                            onClick={() => void runDistill()}>
+                      <IconPlayerPlay size={16} aria-hidden="true" /> {t("Distill today now")}
+                    </button>
+                    <button className="btn" disabled={!enabled || busy === "audit"}
+                            onClick={() => void runAudit()}>
+                      <IconRefresh size={16} aria-hidden="true" /> {t("Run audit now")}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -493,6 +501,7 @@ export function ProfilePage() {
                           className="input"
                           value={fieldValues[def.key] ?? ""}
                           placeholder={def.hint ? t(def.hint) : ""}
+                          readOnly={demoMode}
                           onChange={(e) => setFieldValues((prev) => ({ ...prev, [def.key]: e.target.value }))}
                         />
                         <div className="profile-field-meta">
@@ -570,17 +579,19 @@ export function ProfilePage() {
                     </div>
                   </div>
                 )}
-                <div className="profile-fields-actions">
-                  <button className="btn primary" disabled={busy === "fields"}
-                          onClick={() => void saveFields()}>
-                    {t("Save fields")}
-                  </button>
-                  <button className="btn" disabled={busy === "suggest"}
-                          onClick={() => void autofillFields()}>
-                    <IconSparkles size={16} aria-hidden="true" />
-                    {busy === "suggest" ? t("Thinking…") : t("Let AI fill this in")}
-                  </button>
-                </div>
+                {!demoMode && (
+                  <div className="profile-fields-actions">
+                    <button className="btn primary" disabled={busy === "fields"}
+                            onClick={() => void saveFields()}>
+                      {t("Save fields")}
+                    </button>
+                    <button className="btn" disabled={busy === "suggest"}
+                            onClick={() => void autofillFields()}>
+                      <IconSparkles size={16} aria-hidden="true" />
+                      {busy === "suggest" ? t("Thinking…") : t("Let AI fill this in")}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -589,15 +600,17 @@ export function ProfilePage() {
                 <span className="kicker">{t("Manual profile")}</span>
               </div>
               <div className="panel-body" style={{ display: "grid", gap: 14 }}>
-                <p className="muted">{t("Free-form notes about yourself (Markdown). Included verbatim in the profile output.")}</p>
-                <textarea className="textarea" rows={10} value={manual}
+                <p className="muted">{t("A free-form introduction about yourself (Markdown). Included verbatim in the profile output.")}</p>
+                <textarea className="textarea" rows={10} value={manual} readOnly={demoMode}
                           onChange={(e) => setManual(e.target.value)} />
-                <div>
-                  <button className="btn primary" disabled={busy === "manual"}
-                          onClick={() => void saveManual()}>
-                    {t("Save manual profile")}
-                  </button>
-                </div>
+                {!demoMode && (
+                  <div>
+                    <button className="btn primary" disabled={busy === "manual"}
+                            onClick={() => void saveManual()}>
+                      {t("Save manual profile")}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -651,12 +664,14 @@ export function ProfilePage() {
                           <span>{claim.text}</span>
                           <SourceLinks claim={claim} />
                         </div>
-                        <div className="claim-actions">
-                          <button className="btn small danger" disabled={busy === `claim-${claim.id}`}
-                                  onClick={() => void resolveClaim(claim.id, "delete")}>
-                            <IconTrash size={14} aria-hidden="true" />
-                          </button>
-                        </div>
+                        {!demoMode && (
+                          <div className="claim-actions">
+                            <button className="btn small danger" disabled={busy === `claim-${claim.id}`}
+                                    onClick={() => void resolveClaim(claim.id, "delete")}>
+                              <IconTrash size={14} aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -683,18 +698,24 @@ export function ProfilePage() {
               </div>
               <div className="panel-body" style={{ display: "grid", gap: 14 }}>
                 <p className="muted">{t("A dream reorganizes the profile offline: dedupe, merge, resolve conflicts and induce long-term patterns — always rewriting from original memory text. The result is a candidate version you review before it takes effect.")}</p>
-                <label className="field">
-                  <span>{t("Instructions (optional)")}</span>
-                  <input className="input" value={dreamInstructions}
-                         placeholder={t("e.g. focus on work-related claims")}
-                         onChange={(e) => setDreamInstructions(e.target.value)} />
-                </label>
-                <div>
-                  <button className="btn primary" disabled={!enabled || busy === "dream-start" || hasRunningDream}
-                          onClick={() => void startDream()}>
-                    <IconZzz size={16} aria-hidden="true" /> {t("Start dream")}
-                  </button>
-                </div>
+                {demoMode ? (
+                  <p className="muted">{t("A dream is the heaviest language model job AsterMem runs, and the demo has no model attached. Run your own instance to try it.")}</p>
+                ) : (
+                  <>
+                    <label className="field">
+                      <span>{t("Instructions (optional)")}</span>
+                      <input className="input" value={dreamInstructions}
+                             placeholder={t("e.g. focus on work-related claims")}
+                             onChange={(e) => setDreamInstructions(e.target.value)} />
+                    </label>
+                    <div>
+                      <button className="btn primary" disabled={!enabled || busy === "dream-start" || hasRunningDream}
+                              onClick={() => void startDream()}>
+                        <IconZzz size={16} aria-hidden="true" /> {t("Start dream")}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

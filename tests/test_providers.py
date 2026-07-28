@@ -35,7 +35,7 @@ def test_normalize_config_creates_registry_and_active():
     changed = normalize_config(config)
     assert changed is True
     assert set(config["providers"].keys()) == {"builtin", "lmstudio"}
-    assert config["active"]["embedding_provider"] == "builtin"
+    assert config["active"]["embedding_provider"] == "lmstudio"
 
 
 def test_normalize_config_migrates_old_schema():
@@ -94,11 +94,11 @@ def test_get_embedding_model_returns_correct_adapter():
     config = {}
     normalize_config(config)
     model = get_embedding_model(config)
-    assert isinstance(model, providers.LocalONNXEmbedding)
-
-    config["active"]["embedding_provider"] = "lmstudio"
-    model = get_embedding_model(config)
     assert isinstance(model, OpenAICompatibleEmbedding)
+
+    config["active"]["embedding_provider"] = "builtin"
+    model = get_embedding_model(config)
+    assert isinstance(model, providers.LocalONNXEmbedding)
 
     config["providers"]["google"] = dict(PROVIDER_CATALOG["google"])
     config["active"]["embedding_provider"] = "google"
@@ -247,21 +247,23 @@ def test_classify_error():
     assert _classify_error("weird failure").startswith("Connection failed")
 
 
-def test_fresh_install_defaults_to_the_built_in_embedding_model():
-    """A first run has no model server, so anything requiring one leaves search broken."""
+def test_fresh_install_does_not_activate_the_downloading_provider():
+    """
+    The built-in model fetches ~80MB on first use. Making it the default would mean an offline or
+    air-gapped instance reaches for the network on its own and fails at indexing with no
+    explanation, so it stays available but unselected.
+    """
     config = {}
     providers.normalize_config(config)
 
-    assert config["active"]["embedding_provider"] == "builtin"
-    assert "builtin" in config["providers"]
-    # The built-in model does embeddings only, so chat has to point elsewhere.
-    assert config["active"]["chat_provider"] != "builtin"
+    assert config["active"]["embedding_provider"] != "builtin"
+    assert "builtin" in config["providers"], "still offered, just not chosen for the user"
 
 
 def test_migrated_install_keeps_its_embedding_provider():
     """
-    Switching a provider changes vector dimensions, so quietly moving an upgrading user onto the
-    built-in model would invalidate their vector store and break every search until a reindex.
+    Switching a provider changes vector dimensions, so moving an upgrading user onto a different
+    model would invalidate their vector store and break every search until a reindex.
     """
     config = {"model": {"mode": "bailian"}}
     providers.normalize_config(config)

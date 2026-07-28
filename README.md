@@ -11,7 +11,7 @@ AsterMem stores everything locally: plain Markdown files, SQLite, and an on-disk
 - **Own your data** — memories live in `./data/` as Markdown + SQLite + a local vector index. Backing up means copying one folder.
 - **Built for AI agents** — a single `POST /api/agent/call` endpoint, plus a drop-in SKILL package for Cursor and Claude Code.
 - **Hybrid search** — keyword search (Whoosh + jieba) and semantic search (Chroma), with paragraph-level retrieval.
-- **Semantic search with no setup** — a small embedding model runs in-process on first boot, so vector search works before you configure anything. Point it at a stronger provider whenever you like.
+- **Works offline** — nothing is fetched from a third party at runtime. Keyword search, the web UI, and the whole storage layer run with the network unplugged; only the model provider you choose talks to anything.
 - **Bring your own models** — 24 providers out of the box, including LM Studio and Ollama for local inference, plus OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Moonshot, Zhipu, MiniMax, OpenRouter and more. Providers are config-driven; add your own without touching code.
 - **Clean web UI** — a React SPA, available in 10 languages: English, Deutsch, Español, Français, Português, Русский, 日本語, 한국어, 繁體中文, and 简体中文.
 
@@ -36,7 +36,7 @@ cd astermem
 
 The start script is idempotent: the first run creates `venv/`, installs dependencies, builds the web UI, and starts the server. Subsequent runs skip anything already in place and boot in seconds. Useful flags: `--rebuild-ui` after changing `web-ui/`, `--skip-ui`, `--reinstall` (PowerShell: `-RebuildUi`, `-SkipUi`, `-Reinstall`).
 
-On first boot, the script prints the web UI address (a random port between 8000 and 9000, saved to `config.yaml`). Log in with the default credentials **`admin` / `admin`** and change them under **Admin → Sign-in**. Semantic search already works: the built-in embedding model downloads once (about 80 MB) the first time it is used. Swap in a stronger provider under **Settings** whenever you want.
+On first boot, the script prints the web UI address (a random port between 8000 and 9000, saved to `config.yaml`). Log in with the default credentials **`admin` / `admin`** and change them under **Admin → Sign-in**. Keyword search works immediately; pick an embedding provider under **Settings** to turn on semantic search. Every provider is a service you choose, including local ones like LM Studio and Ollama, so an offline instance stays offline.
 
 AsterMem is single-user by design — there's exactly one admin account. On a machine only you can reach, you can disable **Require a username and password** in **Admin → Sign-in** to browse without logging in. API tokens used by your AI agents aren't affected by that switch.
 

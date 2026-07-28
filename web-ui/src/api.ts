@@ -9,6 +9,7 @@
  * this module performs no business field validation, only guarantees "get JSON or throw ApiError".
  */
 import { emitToast } from "./toast";
+import { translateStandalone } from "./i18n";
 
 export class ApiError extends Error {
   status: number;
@@ -234,6 +235,8 @@ export function sseStream(path: string, body: unknown, handlers: SseHandlers): (
 export function reportError(err: unknown, fallback: string) {
   console.error("[AsterMem]", err);
   if (err instanceof ApiError && err.status === 401) return; // Already redirecting to login, no toast needed
-  const message = err instanceof ApiError && err.message ? err.message : fallback;
+  const message = err instanceof ApiError && err.message
+    ? translateStandalone(err.message)
+    : fallback;
   emitToast("error", message);
 }

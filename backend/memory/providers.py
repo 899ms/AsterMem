@@ -75,8 +75,11 @@ def _parse_gemini_usage(data: dict) -> tuple[int, int, int]:
 # available items, not installed ones. New instances only install LM Studio;
 # other Providers enter config.providers after explicit user or AI addition.
 PROVIDER_CATALOG: dict = {
+    # Not a default: selecting it fetches roughly 80 MB of model on first use, which an offline
+    # or air-gapped instance cannot do. The name has to say so, because every other local option
+    # here runs against something the user already installed.
     "builtin": {
-        "name": "Built-in (no setup)",
+        "name": "Built-in model (one-time ~80 MB download)",
         "category": "local",
         "api_type": "local_onnx",
         "base_url": "",
@@ -303,6 +306,8 @@ PROVIDER_CATALOG: dict = {
     },
 }
 
+# Pre-registered so the built-in model is one click away in Settings, but it is not the active
+# provider: nothing should reach for the network until the user asks for it.
 DEFAULT_PROVIDER_IDS = ("builtin", "lmstudio")
 DEFAULT_PROVIDERS = {provider_id: dict(PROVIDER_CATALOG[provider_id]) for provider_id in DEFAULT_PROVIDER_IDS}
 
@@ -344,11 +349,7 @@ def normalize_config(config: dict) -> bool:
         active_id = mode_map.get(mode, mode if mode in PROVIDER_CATALOG else "lmstudio")
         if active_id not in config["providers"] and active_id in PROVIDER_CATALOG:
             config["providers"][active_id] = dict(PROVIDER_CATALOG[active_id])
-        # A first run has no provider to point at, and the old default assumed a local model server
-        # that is usually not running, so semantic search started out broken. The built-in model
-        # needs nothing, so new instances default to it; upgrades keep whatever they migrated from.
-        embedding_id = active_id if legacy_model else "builtin"
-        config["active"] = {"embedding_provider": embedding_id, "chat_provider": active_id}
+        config["active"] = {"embedding_provider": active_id, "chat_provider": active_id}
         changed = True
 
     providers = config.get("providers", {})

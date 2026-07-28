@@ -38,6 +38,7 @@ from memory.auth import AuthManager
 from memory.usage_tracker import init_usage_tracker
 from memory.database import Database
 from memory.demo_mode import DemoReadOnlyMiddleware, is_demo_mode, seed_demo_library
+from memory.demo_profile import maybe_seed_demo_profile
 from memory.profile import ProfileService, ProfileScheduler
 from memory.profile_dream import DreamManager
 from memory.providers import get_embedding_model, normalize_config
@@ -208,6 +209,14 @@ def build_services(config: dict):
     # when disabled only provides L1/L2 field layer, no LLM calls are made
     profile_service = ProfileService(database, config, data_dir)
     dream_manager = DreamManager(database, profile_service, config)
+
+    # Distillation is what normally fills this layer, and the demo disables it, so the profile is
+    # written by hand here instead. Runs after the service exists but needs no trunks, unlike the
+    # knowledge graph, because claims reference memories directly.
+    if is_demo_mode():
+        result = maybe_seed_demo_profile(profile_service, database)
+        if result and "skipped" not in result:
+            print(f"[demo] Seeded profile: {result}")
 
     return {
         "database": database,

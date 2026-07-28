@@ -16,6 +16,7 @@ import { TagInput } from "../components/TagInput";
 import { LoadingLine } from "../components/EmptyState";
 import { api, reportError } from "../api";
 import { copyText } from "../clipboard";
+import { SOURCE_URL } from "../license";
 import { unwrapMemory } from "../normalize";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
@@ -194,6 +195,23 @@ export function MemoryEditorPage() {
   };
 
   /**
+   * Background: The deployment guide lives in the repo (skill/deploy-astermem/SKILL.md), and the AI
+   * doing the deployment runs on the user's machine, which already has the project checked out.
+   * Design intent: One click copies a self-contained brief—where the guide is (local folder first,
+   * repository as fallback), what to ask the user for, and what "done" looks like—so the user can
+   * paste it into any agent app without hunting for files. No token needed: deployment happens over
+   * SSH, not through this instance's API.
+   */
+  const copyDeployBrief = async () => {
+    const brief = t(
+      "Deploy AsterMem for me, following the deployment guide that ships with the project.\n\n1. Read the guide first: skill/deploy-astermem/SKILL.md inside my local AsterMem folder (the project currently running at {baseUrl}). If you cannot find the folder, fetch the same file from {repo}.\n2. Start by asking me how I want to deploy: a cloud server, or a machine I already own (this computer, a NAS, a Raspberry Pi) exposed through Cloudflare Tunnel with no public IP. Then follow the guide end to end and do the work yourself.\n3. Once it is live, remind me to change the default admin password, and migrate my existing memories by copying my local data/ directory over if needed.\n\nAsk me only for credentials and decisions. When finished, report the final URL and the completion checklist.",
+      { baseUrl: window.location.origin, repo: SOURCE_URL },
+    );
+    if (await copyText(brief)) emitToast("success", t("Instructions copied"));
+    else emitToast("error", t("Copy failed, select the text manually"));
+  };
+
+  /**
    * The second DIY path: batch-upload plain text files.
    * Reuses the import page's /api/import-text, reading each file as text in the browser then submitting,
    * using filename (without extension) as title—no new backend endpoint needed.
@@ -245,11 +263,12 @@ export function MemoryEditorPage() {
       {loading ? (
         <LoadingLine label={t("Loading")} />
       ) : !isEdit && !manualOpen ? (
+        <>
         <section className="ai-handoff">
           <span className="kicker">ASTERMEM SKILL / AI FIRST</span>
-          <h2>{t("Send it to AI. Skip the form.")}</h2>
+          <h2>{t("Operating it? Hand it to AI.")}</h2>
           <p>{t("Hand it to your AI: ask it to write down everything it already knows about you, dig through your files such as your Documents folder, or walk you through picking materials. Whatever it reads gets saved here as memories.")}</p>
-          <p>{t("The more you use it, the better it knows you. It also works as the shared memory hub for all your agents: connect each one to AsterMem and never rebuild a memory base again.")}</p>
+          <p>{t("The more you use it, the better it knows you. It is also the shared memory hub for Claude Code, Codex, Cursor, and every other agent you use: connect each one to AsterMem and they all share the same brain.")}</p>
           <ol>
             <li><span>01</span>{t("Your API token is ready below, already selected.")}</li>
             <li><span>02</span>{t("Copy the setup instructions and send them to your AI.")}</li>
@@ -325,6 +344,21 @@ export function MemoryEditorPage() {
             <p className="mono-sm muted">{t("Multiple selection supported: plain-text files like txt or md, each file becomes one memory.")}</p>
           </div>
         </section>
+
+        {/* Deployment is a sibling "hand it to AI" story: same slab, inverted, no token needed
+            because the AI works over SSH rather than through this instance's API. */}
+        <section className="ai-handoff deploy">
+          <span className="kicker">ASTERMEM DEPLOY / AI FIRST</span>
+          <h2>{t("Deploying it? Hand it to AI.")}</h2>
+          <p>{t("Take AsterMem live on a cloud server, or on a machine you already own — even without a public IP, through Cloudflare Tunnel. A deployment guide written for AI ships with the project: your AI asks how you want to deploy, then does the rest itself, from Docker and HTTPS to go-live hardening.")}</p>
+          <div className="ai-handoff-actions">
+            <button type="button" className="btn primary" onClick={copyDeployBrief}>
+              <IconCopy aria-hidden="true" />
+              {t("Copy instructions for AI")}
+            </button>
+          </div>
+        </section>
+        </>
       ) : (
         <>
           <div className="editor-meta-stack">

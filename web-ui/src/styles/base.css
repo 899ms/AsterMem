@@ -322,6 +322,7 @@ a {
 }
 
 .topbar {
+  position: relative;
   z-index: 40;
   flex: 0 0 auto;
   display: flex;
@@ -362,16 +363,100 @@ a {
  * margin-left:auto groups it with the locale switcher on the right; the topbar is space-between,
  * which would otherwise spread three children evenly across the width.
  */
+/* One right-aligned group, because several items now share that corner and an auto margin on each
+   of them would split the free space instead of stacking them. */
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+}
+
 .topbar-icon {
   display: inline-flex;
   align-items: center;
-  margin-left: auto;
   color: var(--ink);
   transition: opacity 0.15s ease;
 }
 
 .topbar-icon:hover {
   opacity: 0.6;
+}
+
+.demo-badge {
+  position: relative;
+}
+
+.demo-badge > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ink);
+  background: var(--acid);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.demo-badge > button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.demo-badge-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  display: grid;
+  gap: 12px;
+  width: 320px;
+  padding: 16px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 0 12px 28px rgba(21, 22, 19, 0.16);
+}
+
+.demo-badge-lead {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.demo-badge-panel a {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.demo-badge-panel a:hover strong {
+  text-decoration: underline;
+}
+
+.demo-badge-panel a svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.demo-badge-panel a strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.demo-badge-panel a span {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 .topbar-icon svg {
@@ -561,6 +646,23 @@ a {
 
   .topbar {
     padding: 10px 16px;
+  }
+
+  .topbar-right {
+    gap: 10px;
+  }
+
+  /* The badge is not the rightmost item, so anchoring the panel to it leaves too little room and
+     the panel runs off the left edge. Anchor to the bar instead and let it span the full width. */
+  .demo-badge {
+    position: static;
+  }
+
+  .demo-badge-panel {
+    top: 100%;
+    right: 16px;
+    left: 16px;
+    width: auto;
   }
 
   /* Tab bar is a floating layer; content must reserve this height at the bottom, otherwise the last item is hidden beneath it */

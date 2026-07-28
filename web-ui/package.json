@@ -11,6 +11,7 @@
   "dependencies": {
     "@fontsource/dm-mono": "^5.2.5",
     "@fontsource/manrope": "^5.2.5",
+    "@lobehub/icons-static-svg": "^1.94.0",
     "@tabler/icons-react": "^3.31.0",
     "@types/three": "^0.185.1",
     "d3": "^7.9.0",

@@ -72,6 +72,16 @@ function normalizeLocale(value: string | null | undefined): Locale {
 
 export type TFunc = (key: string, vars?: Record<string, string | number>) => string;
 
+/**
+ * Translate outside the React tree, for text that reaches the UI through a non-component path —
+ * chiefly server error messages, which are toasted verbatim and would otherwise stay English in
+ * every other language. Unknown text falls through unchanged, same as t().
+ */
+export function translateStandalone(text: string): string {
+  const locale = normalizeLocale(window.localStorage.getItem(STORAGE_KEY) || navigator.language);
+  return DICTS[locale]?.[text] || text;
+}
+
 interface I18nValue {
   locale: Locale;
   setLocale: (next: string) => void;

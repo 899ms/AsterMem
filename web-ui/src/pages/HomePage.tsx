@@ -6,12 +6,14 @@
  */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconArrowRight } from "@tabler/icons-react";
+import { IconArrowRight, IconBrandX, IconCopy } from "@tabler/icons-react";
 import { Layout } from "../components/Layout";
 import { useI18n } from "../i18n";
 import { useAuthSnapshot } from "../authState";
-import { SOURCE_URL } from "../license";
+import { SOURCE_URL, X_HANDLE, X_URL } from "../license";
 import { api } from "../api";
+import { emitToast } from "../toast";
+import { copyText } from "../clipboard";
 
 interface Stats {
   total?: number;
@@ -32,6 +34,22 @@ export function HomePage() {
       .then((res) => setStats(res ?? {}))
       .catch(() => setStats({}));
   }, []);
+
+  /**
+   * Background: The deployment guide lives in the repo (skill/deploy-astermem/SKILL.md), and the AI
+   * doing the deployment runs on the user's machine, which already has the project checked out.
+   * Design intent: One click copies a self-contained brief—where the guide is (local folder first,
+   * repository as fallback), what to ask the user for, and what "done" looks like—so the user can
+   * paste it into any agent app without hunting for files.
+   */
+  const copyDeployBrief = async () => {
+    const brief = t(
+      "Deploy AsterMem for me, following the deployment guide that ships with the project.\n\n1. Read the guide first: skill/deploy-astermem/SKILL.md inside my local AsterMem folder (the project currently running at {baseUrl}). If you cannot find the folder, fetch the same file from {repo}.\n2. Start by asking me how I want to deploy: a cloud server, or a machine I already own (this computer, a NAS, a Raspberry Pi) exposed through Cloudflare Tunnel with no public IP. Then follow the guide end to end and do the work yourself.\n3. Once it is live, remind me to change the default admin password, and migrate my existing memories by copying my local data/ directory over if needed.\n\nAsk me only for credentials and decisions. When finished, report the final URL and the completion checklist.",
+      { baseUrl: window.location.origin, repo: SOURCE_URL },
+    );
+    if (await copyText(brief)) emitToast("success", t("Instructions copied"));
+    else emitToast("error", t("Copy failed, select the text manually"));
+  };
 
   const features = demoMode
     ? [
@@ -102,7 +120,7 @@ export function HomePage() {
         </p>
       </section>
 
-      {demoMode ? (
+      {demoMode && (
         <a className="home-ai-banner" href={SOURCE_URL} target="_blank" rel="noreferrer">
           <span className="kicker">ASTERMEM / SELF-HOSTED</span>
           <div>
@@ -114,18 +132,48 @@ export function HomePage() {
             <IconArrowRight aria-hidden="true" />
           </span>
         </a>
-      ) : (
+      )}
+
+      {demoMode && (
+        <a className="home-ai-banner contact" href={X_URL} target="_blank" rel="noreferrer">
+          <span className="kicker">ASTERMEM / CONTACT</span>
+          <div>
+            <h2>{t("Questions? Ask us on X")}</h2>
+            <p>{t("This demo answers to nobody: there are no accounts and no inbox. If something here is unclear, broken, or you want to know where AsterMem is headed, write to {handle} on X and you will reach the people who build it.", { handle: X_HANDLE })}</p>
+          </div>
+          <span className="home-ai-banner-link">
+            <IconBrandX aria-hidden="true" />
+            {X_HANDLE}
+          </span>
+        </a>
+      )}
+
+      {!demoMode && (
         <Link to="/new" className="home-ai-banner">
           <span className="kicker">ASTERMEM SKILL / AI FIRST</span>
           <div>
-            <h2>{t("Connect your AI first")}</h2>
-            <p>{t("Download the AsterMem Skill, send the setup instructions to your AI, and let it handle memories, providers, and system settings through the API.")}</p>
+            <h2>{t("Operating it? Hand it to AI.")}</h2>
+            <p>{t("Works with nearly every AI agent app: Claude Code, Codex, Cursor, and more. Install the Skill once and they all share one memory brain, with memories, providers, and system settings handled through the API.")}</p>
           </div>
           <span className="home-ai-banner-link">
             {t("Set up AI")}
             <IconArrowRight aria-hidden="true" />
           </span>
         </Link>
+      )}
+
+      {!demoMode && (
+        <button type="button" className="home-ai-banner deploy" onClick={copyDeployBrief}>
+          <span className="kicker">ASTERMEM DEPLOY / AI FIRST</span>
+          <div>
+            <h2>{t("Deploying it? Hand it to AI.")}</h2>
+            <p>{t("Take AsterMem live on a cloud server, or on a machine you already own — even without a public IP, through Cloudflare Tunnel. A deployment guide written for AI ships with the project: your AI asks how you want to deploy, then does the rest itself, from Docker and HTTPS to go-live hardening.")}</p>
+          </div>
+          <span className="home-ai-banner-link">
+            {t("Copy instructions for AI")}
+            <IconCopy aria-hidden="true" />
+          </span>
+        </button>
       )}
 
       {stats && (

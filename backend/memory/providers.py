@@ -25,6 +25,7 @@ AGPL-3.0 License
 import os
 import re
 import time
+from pathlib import Path
 from typing import List, Optional
 
 import httpx
@@ -74,6 +75,15 @@ def _parse_gemini_usage(data: dict) -> tuple[int, int, int]:
 # available items, not installed ones. New instances only install LM Studio;
 # other Providers enter config.providers after explicit user or AI addition.
 PROVIDER_CATALOG: dict = {
+    "builtin": {
+        "name": "Built-in (no setup)",
+        "category": "local",
+        "api_type": "local_onnx",
+        "base_url": "",
+        "api_key_env": "",
+        "embedding_model": "all-MiniLM-L6-v2",
+        "chat_model": "",
+    },
     "lmstudio": {
         "name": "LM Studio (Local)",
         "category": "local",
@@ -293,7 +303,7 @@ PROVIDER_CATALOG: dict = {
     },
 }
 
-DEFAULT_PROVIDER_IDS = ("lmstudio",)
+DEFAULT_PROVIDER_IDS = ("builtin", "lmstudio")
 DEFAULT_PROVIDERS = {provider_id: dict(PROVIDER_CATALOG[provider_id]) for provider_id in DEFAULT_PROVIDER_IDS}
 
 
@@ -323,7 +333,8 @@ def normalize_config(config: dict) -> bool:
             lp["vlm_model"] = old_local.get("vlm_model", lp.get("vlm_model", ""))
 
     if "active" not in config:
-        mode = (config.get("model", {}) or {}).get("mode", "lmstudio")
+        legacy_model = config.get("model", {}) or {}
+        mode = legacy_model.get("mode", "lmstudio")
         mode_map = {
             "local": "lmstudio",
             "bailian": "dashscope",
@@ -333,7 +344,11 @@ def normalize_config(config: dict) -> bool:
         active_id = mode_map.get(mode, mode if mode in PROVIDER_CATALOG else "lmstudio")
         if active_id not in config["providers"] and active_id in PROVIDER_CATALOG:
             config["providers"][active_id] = dict(PROVIDER_CATALOG[active_id])
-        config["active"] = {"embedding_provider": active_id, "chat_provider": active_id}
+        # A first run has no provider to point at, and the old default assumed a local model server
+        # that is usually not running, so semantic search started out broken. The built-in model
+        # needs nothing, so new instances default to it; upgrades keep whatever they migrated from.
+        embedding_id = active_id if legacy_model else "builtin"
+        config["active"] = {"embedding_provider": embedding_id, "chat_provider": active_id}
         changed = True
 
     providers = config.get("providers", {})
@@ -588,6 +603,60 @@ class GeminiEmbedding(EmbeddingModel):
             return True, f"{self.provider_name} connected", len(vec)
         except Exception as e:
             return False, _classify_error(str(e)), 0
+
+
+class LocalONNXEmbedding(EmbeddingModel):
+    """
+    Background: every other embedding adapter talks to an HTTP endpoint, so semantic search stayed
+    switched off until the user signed up somewhere or ran a model server. Vector search is the
+    feature the project is built around, which made the default experience the weakest one.
+    Design intent: run all-MiniLM-L6-v2 in-process through the ONNX runtime that ships with
+    chromadb, an existing dependency. No key, no daemon, no network, no per-query cost.
+    Key constraints:
+      - 384 dimensions, unlike the hosted models; switching to or from this provider invalidates
+        the vector store and the caller must reindex
+      - The model is loaded on first embed, not at construction: the factory builds an adapter
+        whenever config is read, and paying ~100MB of RSS for an inactive provider is wasteful
+      - Weights are fetched once on first use, so the cache directory has to stay writable and
+        should outlive a restart; ASTERMEM_MODEL_CACHE moves it off the default home path for
+        sandboxed deployments
+    """
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", provider_name: str = "Built-in"):
+        self.model = model_name
+        self.provider_name = provider_name
+        self.provider_id = ""
+        self._encoder = None
+
+    def _get_encoder(self):
+        if self._encoder is None:
+            from chromadb.utils import embedding_functions
+
+            encoder_class = embedding_functions.ONNXMiniLM_L6_V2
+            cache_dir = os.environ.get("ASTERMEM_MODEL_CACHE")
+            if cache_dir:
+                encoder_class.DOWNLOAD_PATH = Path(cache_dir) / self.model
+            self._encoder = encoder_class()
+        return self._encoder
+
+    def embed(self, text: str) -> List[float]:
+        return self.embed_batch([text])[0]
+
+    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        # The runtime rejects empty strings, and callers do pass blank trunks through.
+        cleaned = [t if t and t.strip() else " " for t in texts]
+        # The encoder hands back numpy arrays, whose float32 scalars survive a plain list() and are
+        # then refused by the chroma client, so the conversion has to reach the elements.
+        return [[float(value) for value in vector] for vector in self._get_encoder()(cleaned)]
+
+    def test_connection(self) -> tuple[bool, str, int]:
+        try:
+            vec = self.embed("connection test")
+            return True, f"{self.provider_name} ready", len(vec)
+        except Exception as e:
+            return False, f"Local model unavailable: {e}", 0
 
 
 # ==================== Chat protocol adapters ====================
@@ -1063,7 +1132,9 @@ def _build_embedding(
     embedding_model = entry.get("embedding_model") or ""
     if not embedding_model:
         return None
-    if entry.get("api_type") == "gemini":
+    if entry.get("api_type") == "local_onnx":
+        model = LocalONNXEmbedding(embedding_model, name)
+    elif entry.get("api_type") == "gemini":
         model = GeminiEmbedding(entry["base_url"], embedding_model, api_key, name)
     else:
         model = OpenAICompatibleEmbedding(entry["base_url"], embedding_model, api_key, name)

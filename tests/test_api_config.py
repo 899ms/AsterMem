@@ -89,7 +89,13 @@ def test_add_and_remove_provider(client):
 
 
 def test_cannot_remove_active_provider(client):
-    resp = client.put("/api/config", json={"remove_providers": ["lmstudio"]})
+    # Reads the active provider rather than naming one: the client fixture is session-scoped, so
+    # hardcoding an id couples this to the default registry and to whatever earlier tests left set.
+    active = client.get("/api/config").json()["active"]
+    resp = client.put("/api/config", json={"remove_providers": [active["embedding_provider"]]})
+    assert resp.status_code == 400
+
+    resp = client.put("/api/config", json={"remove_providers": [active["chat_provider"]]})
     assert resp.status_code == 400
 
 

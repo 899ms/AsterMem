@@ -34,8 +34,8 @@ def test_normalize_config_creates_registry_and_active():
     config = {}
     changed = normalize_config(config)
     assert changed is True
-    assert set(config["providers"].keys()) == {"lmstudio"}
-    assert config["active"]["embedding_provider"] == "lmstudio"
+    assert set(config["providers"].keys()) == {"builtin", "lmstudio"}
+    assert config["active"]["embedding_provider"] == "builtin"
 
 
 def test_normalize_config_migrates_old_schema():
@@ -93,6 +93,10 @@ def test_resolve_api_key_empty_env_name():
 def test_get_embedding_model_returns_correct_adapter():
     config = {}
     normalize_config(config)
+    model = get_embedding_model(config)
+    assert isinstance(model, providers.LocalONNXEmbedding)
+
+    config["active"]["embedding_provider"] = "lmstudio"
     model = get_embedding_model(config)
     assert isinstance(model, OpenAICompatibleEmbedding)
 
@@ -241,3 +245,75 @@ def test_classify_error():
     assert "Rate limited" in _classify_error("429 Too Many Requests")
     assert "timeout" in _classify_error("connect timeout").lower()
     assert _classify_error("weird failure").startswith("Connection failed")
+
+
+def test_fresh_install_defaults_to_the_built_in_embedding_model():
+    """A first run has no model server, so anything requiring one leaves search broken."""
+    config = {}
+    providers.normalize_config(config)
+
+    assert config["active"]["embedding_provider"] == "builtin"
+    assert "builtin" in config["providers"]
+    # The built-in model does embeddings only, so chat has to point elsewhere.
+    assert config["active"]["chat_provider"] != "builtin"
+
+
+def test_migrated_install_keeps_its_embedding_provider():
+    """
+    Switching a provider changes vector dimensions, so quietly moving an upgrading user onto the
+    built-in model would invalidate their vector store and break every search until a reindex.
+    """
+    config = {"model": {"mode": "bailian"}}
+    providers.normalize_config(config)
+
+    assert config["active"]["embedding_provider"] == "dashscope"
+
+
+def test_configured_install_is_left_alone():
+    config = {
+        "providers": {"openrouter": {"name": "OR", "base_url": "x", "embedding_model": "m"}},
+        "active": {"embedding_provider": "openrouter", "chat_provider": "openrouter"},
+    }
+    providers.normalize_config(config)
+
+    assert config["active"]["embedding_provider"] == "openrouter"
+
+
+def test_built_in_embedding_loads_the_model_lazily():
+    """
+    The factory builds an adapter every time config is read, so loading weights in the constructor
+    would cost ~100MB of RSS on instances that never use this provider.
+    """
+    model = providers.LocalONNXEmbedding()
+
+    assert model._encoder is None
+
+
+def test_built_in_embedding_returns_plain_floats():
+    """
+    The ONNX encoder returns numpy arrays. list() on one yields float32 scalars, which the chroma
+    client rejects on add, so every vector was silently dropped from the index.
+    """
+    numpy = pytest.importorskip("numpy")
+    model = providers.LocalONNXEmbedding()
+    model._encoder = lambda texts: numpy.zeros((len(texts), 4), dtype=numpy.float32)
+
+    vectors = model.embed_batch(["text"])
+
+    assert all(type(value) is float for value in vectors[0])
+
+
+def test_built_in_embedding_survives_blank_input():
+    """Callers do pass empty trunks through, and the ONNX runtime rejects empty strings."""
+    model = providers.LocalONNXEmbedding()
+    calls = []
+
+    def fake_encoder(texts):
+        calls.append(texts)
+        return [[0.0] * 384 for _ in texts]
+
+    model._encoder = fake_encoder
+    vectors = model.embed_batch(["", "   ", "real text"])
+
+    assert len(vectors) == 3
+    assert all(text.strip() or text == " " for text in calls[0])

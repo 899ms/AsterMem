@@ -2055,9 +2055,30 @@
   text-transform: uppercase;
 }
 
-.landing-nav nav > a:not(.landing-nav-cta):hover {
+.landing-nav nav > a:not(.landing-nav-cta):not(.landing-nav-icon):hover {
   text-decoration: underline;
   text-underline-offset: 5px;
+}
+
+/*
+ * Source link in the landing nav. It sits among text links, so it carries the same ink colour —
+ * muted grey next to solid text reads as disabled. Being an icon, hover fades it instead of
+ * underlining like its neighbours.
+ */
+.landing-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+  transition: opacity 0.15s ease;
+}
+
+.landing-nav-icon:hover {
+  opacity: 0.6;
+}
+
+.landing-nav-icon svg {
+  width: 19px;
+  height: 19px;
 }
 
 .landing-nav-cta {
@@ -2479,7 +2500,9 @@
     justify-self: start;
   }
 
-  .landing-nav nav > a:not(.landing-nav-cta) {
+  /* Section links are dropped on narrow screens, but the source link is an icon and costs
+     almost no width, so it stays reachable here too. */
+  .landing-nav nav > a:not(.landing-nav-cta):not(.landing-nav-icon) {
     display: none;
   }
 

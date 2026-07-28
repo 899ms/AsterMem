@@ -356,6 +356,29 @@ a {
   content: "/";
 }
 
+/*
+ * Source link in the top bar. AGPL-3.0 section 13 expects network users to be offered the
+ * corresponding source, so it sits at a fixed spot on every page rather than only in the footer.
+ * margin-left:auto groups it with the locale switcher on the right; the topbar is space-between,
+ * which would otherwise spread three children evenly across the width.
+ */
+.topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  color: var(--ink);
+  transition: opacity 0.15s ease;
+}
+
+.topbar-icon:hover {
+  opacity: 0.6;
+}
+
+.topbar-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
 .page-body {
   flex: 1;
   min-height: 0;

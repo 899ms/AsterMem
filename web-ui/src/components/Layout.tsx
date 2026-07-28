@@ -12,10 +12,11 @@
  */
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { IconX } from "@tabler/icons-react";
+import { IconBrandGithub, IconX } from "@tabler/icons-react";
 import { LocaleSwitcher, useI18n } from "../i18n";
 import { api, reportError } from "../api";
 import { useAuthSnapshot } from "../authState";
+import { SOURCE_URL } from "../license";
 import { MobileTabBar } from "./MobileTabBar";
 
 type NavEntry = { to: string; label: string; end?: boolean } | { group: string };
@@ -181,6 +182,16 @@ export function Layout({ title, actions, toolbar, fill, children }: {
             <em>{navIndex(currentLinkIndex)}</em>
             {t(navLinks[currentLinkIndex]?.label ?? "Home")}
           </span>
+          <a
+            className="topbar-icon"
+            href={SOURCE_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t("Source code")}
+            title={t("Source code")}
+          >
+            <IconBrandGithub aria-hidden="true" />
+          </a>
           <LocaleSwitcher />
         </header>
         <main className={fill ? "page-body page-body-fill" : "page-body"}>

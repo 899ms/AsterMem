@@ -4,7 +4,7 @@
  * with AuthGate handling login redirects.
  */
 import { Link } from "react-router-dom";
-import { IconArrowRight } from "@tabler/icons-react";
+import { IconArrowRight, IconBrandGithub } from "@tabler/icons-react";
 import { LocaleSwitcher, useI18n } from "../i18n";
 import { LICENSE_NAME, LICENSE_URL, SOURCE_URL } from "../license";
 
@@ -31,6 +31,16 @@ export function LandingPage() {
           <a href="#features">{t("Features")}</a>
           <a href="#how-it-works">{t("How it works")}</a>
           <Link to="/methodology">{t("Methodology")}</Link>
+          <a
+            className="landing-nav-icon"
+            href={SOURCE_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={t("Source code")}
+            title={t("Source code")}
+          >
+            <IconBrandGithub aria-hidden="true" />
+          </a>
           <LocaleSwitcher />
           <Link to="/home" className="landing-nav-cta">
             {t("Open AsterMem")}

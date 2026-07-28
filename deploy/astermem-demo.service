@@ -1,0 +1,38 @@
+[Unit]
+Description=AsterMem public read-only demo
+Documentation=https://github.com/Asterove/AsterMem
+After=network-online.target
+Wants=network-online.target
+# The data directory is a tmpfs mount; starting before it is ready would seed the
+# library onto the real disk and then have it shadowed by the mount.
+RequiresMountsFor=/opt/astermem/data
+
+[Service]
+Type=exec
+WorkingDirectory=/opt/astermem
+Environment=ASTERMEM_DEMO_MODE=1
+Environment=ASTERMEM_PORT=8768
+# config.yaml lives on the tmpfs too: ProtectSystem=strict makes the checkout read-only,
+# and regenerating defaults each boot is exactly what a demo wants.
+Environment=ASTERMEM_CONFIG=/opt/astermem/data/config.yaml
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/astermem/venv/bin/python /opt/astermem/server.py
+Restart=always
+RestartSec=5
+
+# Hardening: the demo answers anonymous public traffic, so the process gets no more
+# than it needs. /opt/astermem/data is the single writable path.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+ReadWritePaths=/opt/astermem/data
+
+[Install]
+WantedBy=multi-user.target

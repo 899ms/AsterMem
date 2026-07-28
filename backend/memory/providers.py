@@ -1110,6 +1110,14 @@ def get_chat_model(config: dict, caller: str = "chat"):
     caller is the default usage attribution context (chunking / profile / meta-extract, etc.);
     individual calls can override with method-level caller kwarg.
     """
+    # A public demo must not be able to spend API credits. Cutting the model off here covers every
+    # caller at once — chunking, tag generation, metadata extraction, profile distillation — so a
+    # reachable code path cannot turn into a bill. Callers already degrade when this returns None.
+    from .demo_mode import is_demo_mode
+
+    if is_demo_mode():
+        return None
+
     normalize_config(config)
     provider_id = (config.get("active") or {}).get("chat_provider", "lmstudio")
     entry = get_provider_entry(config, provider_id)

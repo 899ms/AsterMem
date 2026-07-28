@@ -136,3 +136,16 @@ def test_flag_defaults_to_off(monkeypatch):
     """A normal self-hosted instance must never come up read-only by accident."""
     monkeypatch.delenv("ASTERMEM_DEMO_MODE", raising=False)
     assert is_demo_mode() is False
+
+
+def test_demo_mode_yields_no_chat_model(monkeypatch):
+    """
+    Every LLM caller goes through get_chat_model, so returning None there is what guarantees a
+    public demo cannot run up an API bill even if a code path stays reachable.
+    """
+    from memory.providers import get_chat_model
+
+    config = {"active": {"chat_provider": "lmstudio"}}
+
+    monkeypatch.setenv("ASTERMEM_DEMO_MODE", "1")
+    assert get_chat_model(config, caller="chunking") is None

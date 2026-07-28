@@ -48,25 +48,6 @@ function isLink(entry: NavEntry): entry is { to: string; label: string; end?: bo
   return "to" in entry;
 }
 
-/**
- * Routes that stay reachable in the public demo. Everything else either writes to disk, spends
- * API credits, or exposes provider credentials, and the backend already rejects those requests —
- * hiding them keeps visitors from walking into a wall of 403s.
- */
-const DEMO_ROUTES = new Set(["/home", "/memories", "/tags", "/graph", "/methodology"]);
-
-function visibleNavItems(demoMode: boolean): NavEntry[] {
-  if (!demoMode) return NAV_ITEMS;
-  const kept = NAV_ITEMS.filter((entry) => !isLink(entry) || DEMO_ROUTES.has(entry.to));
-  // Drop group headers whose section came out empty: look ahead only as far as the next header.
-  return kept.filter((entry, i) => {
-    if (isLink(entry)) return true;
-    const next = kept.slice(i + 1);
-    const until = next.findIndex((item) => !isLink(item));
-    return (until === -1 ? next : next.slice(0, until)).length > 0;
-  });
-}
-
 const navIndex = (position: number) => String(position + 1).padStart(2, "0");
 
 /** Deep link parent mapping: /view/:id and /edit/:id belong under "Memories" */
@@ -89,8 +70,7 @@ export function Layout({ title, actions, toolbar, fill, children }: {
   const { loginRequired, username, demoMode } = useAuthSnapshot();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const navItems = useMemo(() => visibleNavItems(demoMode), [demoMode]);
-  const navLinks = useMemo(() => navItems.filter(isLink), [navItems]);
+  const navLinks = useMemo(() => NAV_ITEMS.filter(isLink), []);
 
   const parent = DEEP_LINK_PARENT.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
   const activePath = parent ?? location.pathname;
@@ -145,7 +125,7 @@ export function Layout({ title, actions, toolbar, fill, children }: {
         <nav className="sidebar-nav">
           {(() => {
             let linkIdx = 0;
-            return navItems.map((entry, i) => {
+            return NAV_ITEMS.map((entry, i) => {
               if (!isLink(entry)) {
                 return <span key={`g-${i}`} className="sidebar-group">{t(entry.group)}</span>;
               }

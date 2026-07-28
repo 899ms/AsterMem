@@ -90,6 +90,8 @@ const dict: Record<string, string> = {
   "{count} token(s) available": "사용 가능한 Token {count}개",
   "Preparing an API token": "API Token을 준비하는 중이에요",
   "Could not prepare a token automatically. Create one in Admin, then come back.": "Token을 자동으로 준비하지 못했어요. 관리에서 하나 만든 뒤 다시 오세요.",
+  "The demo issues no tokens. Run your own instance to connect an AI to it.": "데모에서는 토큰을 발급하지 않아요. AI를 연결하려면 직접 인스턴스를 실행하세요.",
+  "This page needs a language model, and the demo runs without one so it stays free to host. Run your own instance to use it.": "이 페이지는 언어 모델이 필요한데, 데모는 무료로 운영하려고 모델 없이 돌아갑니다. 쓰려면 직접 인스턴스를 실행하세요.",
   "Created a default API token for you": "기본 API Token을 만들어 두었어요",
   "Pick a token so the AI can connect without asking you for it.": "Token을 선택하면 AI가 따로 묻지 않고 바로 연결해요.",
   "This token will be included in the copied instructions.": "복사되는 안내에 이 Token이 포함됩니다.",

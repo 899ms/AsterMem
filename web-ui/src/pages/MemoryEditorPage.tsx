@@ -19,6 +19,7 @@ import { copyText } from "../clipboard";
 import { unwrapMemory } from "../normalize";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
+import { useAuthSnapshot } from "../authState";
 import type { TokenItem } from "../types";
 
 /** Auto-created token name for new users; read/write/config scopes are just enough for AI onboarding. */
@@ -26,6 +27,7 @@ const DEFAULT_TOKEN_NAME = "AI";
 
 export function MemoryEditorPage() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
@@ -77,6 +79,9 @@ export function MemoryEditorPage() {
    */
   useEffect(() => {
     if (isEdit) return;
+    // The demo seals the token endpoints, so the whole bootstrap can only fail here. Visitors are
+    // told to run their own instance instead of being pointed at an Admin page that will refuse.
+    if (demoMode) return;
     let cancelled = false;
     const listActive = async () => {
       const res = await api<unknown>("GET", "/api/tokens");
@@ -261,9 +266,11 @@ export function MemoryEditorPage() {
             </span>
             {tokens.length === 0 ? (
               <p className="mono-sm muted">
-                {tokenLoading
-                  ? t("Preparing an API token")
-                  : t("Could not prepare a token automatically. Create one in Admin, then come back.")}
+                {demoMode
+                  ? t("The demo issues no tokens. Run your own instance to connect an AI to it.")
+                  : tokenLoading
+                    ? t("Preparing an API token")
+                    : t("Could not prepare a token automatically. Create one in Admin, then come back.")}
               </p>
             ) : (
               <>

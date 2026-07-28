@@ -31,11 +31,14 @@ ALLOWED_WRITE_PATHS = frozenset({
     "/api/quick-match",
 })
 
-#: Denied even for GET. These either expose credentials or let a caller drive the whole instance.
+#: Denied even for GET. Every entry costs something to serve or hands out access:
+#:  - tokens are agent credentials, and agent is the read-write channel they unlock
+#:  - explore calls an LLM per request
+#:  - export builds a zip on disk first, which anonymous traffic would pile onto the tmpfs
+#: Reads that merely return empty results in a demo are not listed here: the visitor is meant to
+#: see those pages, and an empty log or a zeroed usage chart tells the truth about this instance.
 BLOCKED_READ_PREFIXES = (
-    "/api/logs",
     "/api/tokens",
-    "/api/usage",
     "/api/explore/",
     "/api/agent/",
     "/api/export",

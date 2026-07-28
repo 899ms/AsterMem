@@ -224,6 +224,19 @@ def build_services(config: dict):
     }
 
 
+def should_log_request(path: str, demo_mode: bool, exclude_paths) -> bool:
+    """
+    Whether a request belongs in the API log.
+
+    The demo answers anonymous public traffic and every visitor reads the same /api/logs page, so
+    logging there would show each visitor what the others searched for. Keeping the log empty is
+    what makes that page safe to expose, rather than the page being hidden.
+    """
+    if demo_mode or not path.startswith("/api/"):
+        return False
+    return not any(path.startswith(excluded) for excluded in exclude_paths)
+
+
 def create_app(config: dict, config_path: str, services: dict):
     """
     Background: A single process must serve REST API, AI channel (/api/agent/call), and SPA static assets.
@@ -263,6 +276,7 @@ def create_app(config: dict, config_path: str, services: dict):
     app = FastAPI(title="AsterMem", description="Self-hosted personal memory service",
                   version="2.0.0", docs_url=None, redoc_url=None, openapi_url=None)
 
+
     api_logger = services["api_logger"]
     demo_mode = is_demo_mode()
 
@@ -289,12 +303,7 @@ def create_app(config: dict, config_path: str, services: dict):
 
         async def dispatch(self, request: Request, call_next):
             path = request.url.path
-            # The demo has no owner to read the log page, and public traffic would append a row
-            # per request for nobody's benefit.
-            should_log = not demo_mode and path.startswith("/api/") and not any(
-                path.startswith(exc) for exc in self.EXCLUDE_PATHS
-            )
-            if not should_log:
+            if not should_log_request(path, demo_mode, self.EXCLUDE_PATHS):
                 return await call_next(request)
 
             start_time = time.time()

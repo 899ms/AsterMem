@@ -90,6 +90,8 @@ const dict: Record<string, string> = {
   "{count} token(s) available": "有 {count} 个 Token 可用",
   "Preparing an API token": "正在准备 API Token",
   "Could not prepare a token automatically. Create one in Admin, then come back.": "无法自动准备 Token，请到管理页创建一个再回来。",
+  "The demo issues no tokens. Run your own instance to connect an AI to it.": "演示环境不发放 Token。要把 AI 接进来，请自行部署一个实例。",
+  "This page needs a language model, and the demo runs without one so it stays free to host. Run your own instance to use it.": "这个页面需要语言模型，演示环境为了零成本运行没有接。想用的话请自行部署一个实例。",
   "Created a default API token for you": "已帮你创建默认 API Token",
   "Pick a token so the AI can connect without asking you for it.": "选好 Token，AI 就不用再回头问你。",
   "This token will be included in the copied instructions.": "复制的指令会带上这个 Token。",

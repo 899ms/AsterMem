@@ -32,6 +32,7 @@ import { Markdown } from "../components/Markdown";
 import { api, sseStream, reportError } from "../api";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
+import { useAuthSnapshot } from "../authState";
 
 const SESSIONS_KEY = "astermem_roam_sessions";
 const SESSIONS_MAX = 5;
@@ -201,6 +202,7 @@ function draftTitle(draft: string, fallback: string): string {
 
 export function ExplorePage() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionIdRef = useRef<string | null>(searchParams.get("s"));
@@ -697,7 +699,9 @@ export function ExplorePage() {
             <div className="roam-welcome">
               <span className="kicker">{t("Memory roaming")}</span>
               <h1>{t("Ask in your own words")}</h1>
-              <p>{t("AsterMem searches your memory base, widens the search on its own when the material is thin, then walks you through the original passages.")}</p>
+              <p>{demoMode
+                ? t("This page needs a language model, and the demo runs without one so it stays free to host. Run your own instance to use it.")
+                : t("AsterMem searches your memory base, widens the search on its own when the material is thin, then walks you through the original passages.")}</p>
               <div className="roam-welcome-input">
                 <input
                   className="input"

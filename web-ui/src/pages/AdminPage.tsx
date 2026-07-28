@@ -15,7 +15,7 @@ import { Layout } from "../components/Layout";
 import { ConfirmModal } from "../components/Modal";
 import { EmptyState } from "../components/EmptyState";
 import { api, reportError } from "../api";
-import { publishAuthSnapshot } from "../authState";
+import { publishAuthSnapshot, useAuthSnapshot } from "../authState";
 import { copyText } from "../clipboard";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
@@ -29,6 +29,7 @@ interface AuthCheck {
 
 export function AdminPage() {
   const { t, locale } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const [savedUsername, setSavedUsername] = useState("");
   const [username, setUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -47,6 +48,9 @@ export function AdminPage() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   const loadTokens = useCallback(async () => {
+    // Tokens are agent credentials and the demo seals that endpoint, so asking would only turn
+    // opening this page into an error toast.
+    if (demoMode) return;
     try {
       const res = await api<unknown>("GET", "/api/tokens");
       const list = Array.isArray(res) ? res : (res as { tokens?: unknown })?.tokens;
@@ -54,7 +58,7 @@ export function AdminPage() {
     } catch (err) {
       reportError(err, t("Unable to load tokens"));
     }
-  }, [t]);
+  }, [t, demoMode]);
 
   const loadAuth = useCallback(async () => {
     try {

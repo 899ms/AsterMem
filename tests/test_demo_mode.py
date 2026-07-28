@@ -96,9 +96,25 @@ def test_search_endpoints_stay_reachable(demo_client, path):
     "/api/tags",
     "/api/methodology",
     "/api/auth/check",
+    # The sidebar shows every page, so the pages behind these have to answer rather than 403.
+    "/api/logs",
+    "/api/usage/summary",
 ])
 def test_reads_stay_reachable(demo_client, path):
     assert demo_client.get(path).status_code == 200
+
+
+def test_demo_mode_records_no_request_log():
+    """
+    Reading /api/logs is only safe because the demo writes no log rows. Public visitors share one
+    instance, so a demo that logged requests would show each visitor the others' search queries.
+    """
+    from main import should_log_request
+
+    excluded = ["/api/logs"]
+    assert should_log_request("/api/search", demo_mode=False, exclude_paths=excluded) is True
+    assert should_log_request("/api/search", demo_mode=True, exclude_paths=excluded) is False
+    assert should_log_request("/api/memories", demo_mode=True, exclude_paths=excluded) is False
 
 
 @pytest.mark.parametrize("prefix", BLOCKED_READ_PREFIXES)

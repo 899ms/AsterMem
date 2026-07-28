@@ -90,6 +90,8 @@ const dict: Record<string, string> = {
   "{count} token(s) available": "Доступно токенов: {count}",
   "Preparing an API token": "Подготовка API-токена",
   "Could not prepare a token automatically. Create one in Admin, then come back.": "Не удалось подготовить токен автоматически. Создайте его в разделе администрирования и вернитесь сюда.",
+  "The demo issues no tokens. Run your own instance to connect an AI to it.": "Демо не выдаёт токены. Запустите свой экземпляр, чтобы подключить к нему ИИ.",
+  "This page needs a language model, and the demo runs without one so it stays free to host. Run your own instance to use it.": "Этой странице нужна языковая модель, а демо работает без неё, чтобы хостинг ничего не стоил. Запустите свой экземпляр, чтобы ею пользоваться.",
   "Created a default API token for you": "Для вас создан API-токен по умолчанию",
   "Pick a token so the AI can connect without asking you for it.": "Выберите токен, чтобы ИИ мог подключиться, не спрашивая его у вас.",
   "This token will be included in the copied instructions.": "Этот токен будет включён в скопированные инструкции.",

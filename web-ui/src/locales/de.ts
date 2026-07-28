@@ -90,6 +90,8 @@ const dict: Record<string, string> = {
   "{count} token(s) available": "{count} Token verfügbar",
   "Preparing an API token": "API-Token wird vorbereitet",
   "Could not prepare a token automatically. Create one in Admin, then come back.": "Token konnte nicht automatisch vorbereitet werden. Erstellen Sie eines in der Verwaltung und kommen Sie zurück.",
+  "The demo issues no tokens. Run your own instance to connect an AI to it.": "Die Demo gibt keine Tokens aus. Betreiben Sie eine eigene Instanz, um eine KI anzubinden.",
+  "This page needs a language model, and the demo runs without one so it stays free to host. Run your own instance to use it.": "Diese Seite braucht ein Sprachmodell. Die Demo läuft ohne eines, damit der Betrieb nichts kostet. Betreiben Sie eine eigene Instanz, um sie zu nutzen.",
   "Created a default API token for you": "Ein Standard-API-Token wurde für Sie erstellt",
   "Pick a token so the AI can connect without asking you for it.": "Wählen Sie ein Token, damit die KI sich verbinden kann, ohne nachzufragen.",
   "This token will be included in the copied instructions.": "Dieses Token wird in die kopierte Anleitung eingefügt.",

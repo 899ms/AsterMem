@@ -90,6 +90,8 @@ const dict: Record<string, string> = {
   "{count} token(s) available": "{count} 個のトークンが利用可能",
   "Preparing an API token": "API トークンを準備中",
   "Could not prepare a token automatically. Create one in Admin, then come back.": "トークンを自動で準備できませんでした。管理ページで作成してから戻ってきてください。",
+  "The demo issues no tokens. Run your own instance to connect an AI to it.": "デモではトークンを発行しません。AI を接続するには自分のインスタンスを立ててください。",
+  "This page needs a language model, and the demo runs without one so it stays free to host. Run your own instance to use it.": "このページには言語モデルが必要ですが、デモは無料で動かすためにモデルを使いません。使うにはご自身のインスタンスを立ててください。",
   "Created a default API token for you": "デフォルトの API トークンを作成しました",
   "Pick a token so the AI can connect without asking you for it.": "トークンを選んでおけば、AI があなたに確認せずに接続できます。",
   "This token will be included in the copied instructions.": "コピーされる指示にこのトークンが含まれます。",

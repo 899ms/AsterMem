@@ -17,6 +17,7 @@ import { Pagination } from "../components/Pagination";
 import { api, reportError } from "../api";
 import { flattenResults } from "../normalize";
 import { useI18n } from "../i18n";
+import { useAuthSnapshot } from "../authState";
 import type { MemoryListResponse, SearchResultItem, TagStat } from "../types";
 
 const PAGE_SIZE = 20;
@@ -181,6 +182,7 @@ function MemoryCard({ memory, onTagClick }: { memory: SearchResultItem; onTagCli
 
 export function MemoryListPage() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const navigate = useNavigate();
   // Detail page tag clicks navigate here with params: ?tag=xxx for tag filter, ?q=xxx for direct search
   const [searchParams] = useSearchParams();
@@ -326,10 +328,12 @@ export function MemoryListPage() {
     <Layout
       title={t("Memories")}
       actions={
-        <button type="button" className="btn primary" onClick={() => navigate("/new")}>
-          <IconPlus aria-hidden="true" />
-          {t("New memory")}
-        </button>
+        demoMode ? undefined : (
+          <button type="button" className="btn primary" onClick={() => navigate("/new")}>
+            <IconPlus aria-hidden="true" />
+            {t("New memory")}
+          </button>
+        )
       }
       fill
       toolbar={
@@ -402,7 +406,7 @@ export function MemoryListPage() {
             <EmptyState
               message={searchActive ? t("No results for this query") : t("No memories yet")}
               action={
-                !searchActive ? (
+                !searchActive && !demoMode ? (
                   <Link to="/new" className="btn small">{t("Create the first memory")}</Link>
                 ) : undefined
               }

@@ -653,6 +653,14 @@ const dict: Record<string, string> = {
   "Free software under": "Freie Software unter",
   "Source code": "Quellcode",
   "AsterMem is free software licensed under {license}. You are entitled to the complete corresponding source code.": "AsterMem ist freie Software unter der Lizenz {license}. Sie haben Anspruch auf den vollstandigen zugehorigen Quellcode.",
+  "Demo": "Demo",
+  "Read-only": "Nur lesen",
+  "Have a look around.": "Sehen Sie sich um.",
+  "This is a read-only demo with a sample library. Nothing you do here is saved. Run your own instance to keep your memories.": "Dies ist eine schreibgeschutzte Demo mit Beispieldaten. Nichts davon wird gespeichert. Betreiben Sie eine eigene Instanz, um Ihre Erinnerungen zu behalten.",
+  "Run it on your own machine": "Auf dem eigenen Rechner betreiben",
+  "AsterMem is free software. Clone the repository, start it with one command, and your memories never leave your disk.": "AsterMem ist freie Software. Repository klonen, mit einem Befehl starten - Ihre Erinnerungen verlassen nie Ihre Festplatte.",
+  "Browse the sample library and pull content back with semantic search.": "Durchsuchen Sie die Beispielbibliothek und holen Sie Inhalte per semantischer Suche zuruck.",
+  "Why original text is the only truth, and how retrieval navigates it.": "Warum nur der Originaltext zahlt und wie die Suche darin navigiert.",
 };
 
 export default dict;

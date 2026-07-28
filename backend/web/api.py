@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from memory.database import Database
+from memory.demo_mode import is_demo_mode
 from memory.storage import MemoryStorage
 from memory.vector import VectorStore
 from memory.embedding import get_embedding_model, get_chat_model
@@ -626,6 +627,17 @@ async def check_auth(request: Request):
     """
     auth = get_auth_manager()
     login_required = auth.is_login_required()
+
+    if is_demo_mode():
+        # Anonymous visitors cannot change credentials anyway, so the usual "change the default
+        # password" prompt would be a dead end; demo_mode lets the UI hide write affordances.
+        return {
+            "authenticated": True,
+            "login_required": False,
+            "demo_mode": True,
+            "username": None,
+            "must_change_credentials": False,
+        }
 
     if not login_required:
         admin = auth.get_admin() or {}

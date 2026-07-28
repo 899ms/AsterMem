@@ -60,8 +60,8 @@ export_*.zip
 
 # Environment variables
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Testing
 .pytest_cache/
@@ -76,8 +76,10 @@ config.yaml
 config.yaml.bak
 backups/
 
-# Internal design docs
-docs/
+# Internal design docs. docs/methodology/ is excluded from this rule: the Methodology page
+# and GET /api/methodology read those files at runtime, and the Docker build copies them in.
+docs/*
+!docs/methodology/
 
 # Editor / agent workspace
 .cursor/

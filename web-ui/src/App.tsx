@@ -47,7 +47,7 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    api<{ authenticated?: boolean; login_required?: boolean; username?: string }>(
+    api<{ authenticated?: boolean; login_required?: boolean; username?: string; demo_mode?: boolean }>(
       "GET",
       "/api/auth/check",
       undefined,
@@ -56,7 +56,11 @@ function AuthGate({ children }: { children: ReactNode }) {
       .then((res) => {
         if (cancelled) return;
         // Reuse probe result for sidebar footer (account name & login protection status)
-        publishAuthSnapshot({ loginRequired: res?.login_required !== false, username: res?.username ?? "" });
+        publishAuthSnapshot({
+          loginRequired: res?.login_required !== false,
+          username: res?.username ?? "",
+          demoMode: Boolean(res?.demo_mode),
+        });
         setState(res?.authenticated ? "ok" : "anonymous");
       })
       .catch((err) => {

@@ -37,6 +37,7 @@ from memory.api_logger import init_api_logger
 from memory.auth import AuthManager
 from memory.usage_tracker import init_usage_tracker
 from memory.database import Database
+from memory.demo_mode import DemoReadOnlyMiddleware, is_demo_mode, seed_demo_library
 from memory.profile import ProfileService, ProfileScheduler
 from memory.profile_dream import DreamManager
 from memory.providers import get_embedding_model, normalize_config
@@ -190,6 +191,14 @@ def build_services(config: dict):
     memory_tools = MemoryTools(sync_manager, search_engine)
     auth_manager = AuthManager(database, config)
 
+    # The demo is a public showcase: force anonymous access and reseed the library, since the
+    # container keeps its data in tmpfs and starts empty on every boot.
+    if is_demo_mode():
+        config.setdefault("auth", {})["login_required"] = False
+        seeded = seed_demo_library(sync_manager, database)
+        if seeded:
+            print(f"[demo] Seeded {seeded} sample memories")
+
     api_logger = init_api_logger(
         os.path.join(data_dir, "api_logs.db"),
         config.get("server", {}).get("api_log_max", 1000),
@@ -241,15 +250,21 @@ def create_app(config: dict, config_path: str, services: dict):
     init_profile_api(services["profile_service"], services["dream_manager"], _save_config)
     init_usage_api(config, _save_config)
 
-    # Profile daily scheduler: daemon thread; idles when profile.enabled is off, no calls made
-    scheduler = ProfileScheduler(services["profile_service"], services["dream_manager"])
-    scheduler.start()
-    services["profile_scheduler"] = scheduler
+    # Profile daily scheduler: daemon thread; idles when profile.enabled is off, no calls made.
+    # The demo has no owner to build a profile for, and distillation would both write to disk
+    # and spend API credits, so the thread is never started there.
+    if is_demo_mode():
+        services["profile_scheduler"] = None
+    else:
+        scheduler = ProfileScheduler(services["profile_service"], services["dream_manager"])
+        scheduler.start()
+        services["profile_scheduler"] = scheduler
 
     app = FastAPI(title="AsterMem", description="Self-hosted personal memory service",
                   version="2.0.0", docs_url=None, redoc_url=None, openapi_url=None)
 
     api_logger = services["api_logger"]
+    demo_mode = is_demo_mode()
 
     class APILogMiddleware(BaseHTTPMiddleware):
         """API call logging: provides data for /logs page, excludes streaming and self-referencing paths"""
@@ -274,7 +289,9 @@ def create_app(config: dict, config_path: str, services: dict):
 
         async def dispatch(self, request: Request, call_next):
             path = request.url.path
-            should_log = path.startswith("/api/") and not any(
+            # The demo has no owner to read the log page, and public traffic would append a row
+            # per request for nobody's benefit.
+            should_log = not demo_mode and path.startswith("/api/") and not any(
                 path.startswith(exc) for exc in self.EXCLUDE_PATHS
             )
             if not should_log:
@@ -341,6 +358,10 @@ def create_app(config: dict, config_path: str, services: dict):
             return response
 
     app.add_middleware(APILogMiddleware)
+    # Registered after APILogMiddleware so it runs first, rejecting denied requests before they
+    # reach any handler.
+    if demo_mode:
+        app.add_middleware(DemoReadOnlyMiddleware)
     app.include_router(api_router)
     app.include_router(explore_router)
     app.include_router(profile_router)

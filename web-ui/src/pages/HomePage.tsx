@@ -9,6 +9,8 @@ import { Link } from "react-router-dom";
 import { IconArrowRight } from "@tabler/icons-react";
 import { Layout } from "../components/Layout";
 import { useI18n } from "../i18n";
+import { useAuthSnapshot } from "../authState";
+import { SOURCE_URL } from "../license";
 import { api } from "../api";
 
 interface Stats {
@@ -22,6 +24,7 @@ interface Stats {
 
 export function HomePage() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
@@ -30,7 +33,30 @@ export function HomePage() {
       .catch(() => setStats({}));
   }, []);
 
-  const features = [
+  const features = demoMode
+    ? [
+        {
+          title: t("Memories"),
+          desc: t("Browse the sample library and pull content back with semantic search."),
+          to: "/memories",
+        },
+        {
+          title: t("Graph"),
+          desc: t("View your memories in a knowledge graph, timeline, or vector space."),
+          to: "/graph",
+        },
+        {
+          title: t("Tags"),
+          desc: t("Organize memories with a tag tree and filter them faster."),
+          to: "/tags",
+        },
+        {
+          title: t("Methodology"),
+          desc: t("Why original text is the only truth, and how retrieval navigates it."),
+          to: "/methodology",
+        },
+      ]
+    : [
     {
       title: t("Memories"),
       desc: t("Open the memory library, keep writing, or pull content back with semantic search."),
@@ -66,21 +92,41 @@ export function HomePage() {
   return (
     <Layout title={t("Home")}>
       <section className="home-hero">
-        <h2 className="home-headline">{t("What do you want to find today?")}</h2>
-        <p className="home-sub">{t("Your memories are here. Keep writing, search the library, ask AI, or open the graph.")}</p>
+        <h2 className="home-headline">
+          {demoMode ? t("Have a look around.") : t("What do you want to find today?")}
+        </h2>
+        <p className="home-sub">
+          {demoMode
+            ? t("This is a read-only demo with a sample library. Nothing you do here is saved. Run your own instance to keep your memories.")
+            : t("Your memories are here. Keep writing, search the library, ask AI, or open the graph.")}
+        </p>
       </section>
 
-      <Link to="/new" className="home-ai-banner">
-        <span className="kicker">ASTERMEM SKILL / AI FIRST</span>
-        <div>
-          <h2>{t("Connect your AI first")}</h2>
-          <p>{t("Download the AsterMem Skill, send the setup instructions to your AI, and let it handle memories, providers, and system settings through the API.")}</p>
-        </div>
-        <span className="home-ai-banner-link">
-          {t("Set up AI")}
-          <IconArrowRight aria-hidden="true" />
-        </span>
-      </Link>
+      {demoMode ? (
+        <a className="home-ai-banner" href={SOURCE_URL} target="_blank" rel="noreferrer">
+          <span className="kicker">ASTERMEM / SELF-HOSTED</span>
+          <div>
+            <h2>{t("Run it on your own machine")}</h2>
+            <p>{t("AsterMem is free software. Clone the repository, start it with one command, and your memories never leave your disk.")}</p>
+          </div>
+          <span className="home-ai-banner-link">
+            {t("Source code")}
+            <IconArrowRight aria-hidden="true" />
+          </span>
+        </a>
+      ) : (
+        <Link to="/new" className="home-ai-banner">
+          <span className="kicker">ASTERMEM SKILL / AI FIRST</span>
+          <div>
+            <h2>{t("Connect your AI first")}</h2>
+            <p>{t("Download the AsterMem Skill, send the setup instructions to your AI, and let it handle memories, providers, and system settings through the API.")}</p>
+          </div>
+          <span className="home-ai-banner-link">
+            {t("Set up AI")}
+            <IconArrowRight aria-hidden="true" />
+          </span>
+        </Link>
+      )}
 
       {stats && (
         <section className="home-stats">

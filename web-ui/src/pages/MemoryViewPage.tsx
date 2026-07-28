@@ -21,6 +21,7 @@ import { api, reportError } from "../api";
 import { flattenResults, unwrapMemory } from "../normalize";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
+import { useAuthSnapshot } from "../authState";
 import type { HistoryEntry, MemoryDetail, MemorySummary, TrunkItem } from "../types";
 
 function asArray<T>(value: unknown, key: string): T[] {
@@ -40,6 +41,7 @@ const flatten = (text: string) => text.replace(/\s+/g, " ").trim();
 
 export function MemoryViewPage() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -158,6 +160,7 @@ export function MemoryViewPage() {
             onClick={() => navigate("/memories")}>
             <IconArrowLeft aria-hidden="true" /><span className="btn-label">{t("Back")}</span>
           </button>
+          {demoMode ? null : <>
           <button type="button" className="btn btn-compact" aria-label={t("Edit")}
             onClick={() => navigate(`/edit/${id}`)}>
             <IconPencil aria-hidden="true" /><span className="btn-label">{t("Edit")}</span>
@@ -179,6 +182,7 @@ export function MemoryViewPage() {
             onClick={() => setConfirmDelete(true)}>
             <IconTrash aria-hidden="true" /><span className="btn-label">{t("Delete")}</span>
           </button>
+          </>}
         </>
       }
     >

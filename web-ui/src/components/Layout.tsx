@@ -11,7 +11,7 @@
  * the drawer must auto-close on route change, otherwise it blocks the new page after navigation.
  */
 import { NavLink, useLocation } from "react-router-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { IconX } from "@tabler/icons-react";
 import { LocaleSwitcher, useI18n } from "../i18n";
 import { api, reportError } from "../api";
@@ -47,7 +47,25 @@ function isLink(entry: NavEntry): entry is { to: string; label: string; end?: bo
   return "to" in entry;
 }
 
-const NAV_LINKS = NAV_ITEMS.filter(isLink);
+/**
+ * Routes that stay reachable in the public demo. Everything else either writes to disk, spends
+ * API credits, or exposes provider credentials, and the backend already rejects those requests —
+ * hiding them keeps visitors from walking into a wall of 403s.
+ */
+const DEMO_ROUTES = new Set(["/home", "/memories", "/tags", "/graph", "/methodology"]);
+
+function visibleNavItems(demoMode: boolean): NavEntry[] {
+  if (!demoMode) return NAV_ITEMS;
+  const kept = NAV_ITEMS.filter((entry) => !isLink(entry) || DEMO_ROUTES.has(entry.to));
+  // Drop group headers whose section came out empty: look ahead only as far as the next header.
+  return kept.filter((entry, i) => {
+    if (isLink(entry)) return true;
+    const next = kept.slice(i + 1);
+    const until = next.findIndex((item) => !isLink(item));
+    return (until === -1 ? next : next.slice(0, until)).length > 0;
+  });
+}
+
 const navIndex = (position: number) => String(position + 1).padStart(2, "0");
 
 /** Deep link parent mapping: /view/:id and /edit/:id belong under "Memories" */
@@ -67,13 +85,16 @@ export function Layout({ title, actions, toolbar, fill, children }: {
 }) {
   const { t } = useI18n();
   const location = useLocation();
-  const { loginRequired, username } = useAuthSnapshot();
+  const { loginRequired, username, demoMode } = useAuthSnapshot();
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const navItems = useMemo(() => visibleNavItems(demoMode), [demoMode]);
+  const navLinks = useMemo(() => navItems.filter(isLink), [navItems]);
 
   const parent = DEEP_LINK_PARENT.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
   const activePath = parent ?? location.pathname;
   const currentLinkIndex = Math.max(
-    NAV_LINKS.findIndex((item) => (item.end ? activePath === item.to : activePath.startsWith(item.to))),
+    navLinks.findIndex((item) => (item.end ? activePath === item.to : activePath.startsWith(item.to))),
     0,
   );
 
@@ -123,7 +144,7 @@ export function Layout({ title, actions, toolbar, fill, children }: {
         <nav className="sidebar-nav">
           {(() => {
             let linkIdx = 0;
-            return NAV_ITEMS.map((entry, i) => {
+            return navItems.map((entry, i) => {
               if (!isLink(entry)) {
                 return <span key={`g-${i}`} className="sidebar-group">{t(entry.group)}</span>;
               }
@@ -144,10 +165,10 @@ export function Layout({ title, actions, toolbar, fill, children }: {
         </nav>
         <div className="sidebar-foot">
           <span className="sidebar-account">
-            <strong>{username || "—"}</strong>
-            <em>{loginRequired ? t("Owner") : t("No sign-in")}</em>
+            <strong>{demoMode ? t("Demo") : username || "—"}</strong>
+            <em>{demoMode ? t("Read-only") : loginRequired ? t("Owner") : t("No sign-in")}</em>
           </span>
-          {loginRequired && (
+          {loginRequired && !demoMode && (
             <button type="button" className="linklike" onClick={handleLogout}>
               {t("Sign out")}
             </button>
@@ -158,7 +179,7 @@ export function Layout({ title, actions, toolbar, fill, children }: {
         <header className="topbar">
           <span className="crumb">
             <em>{navIndex(currentLinkIndex)}</em>
-            {t(NAV_LINKS[currentLinkIndex].label)}
+            {t(navLinks[currentLinkIndex]?.label ?? "Home")}
           </span>
           <LocaleSwitcher />
         </header>

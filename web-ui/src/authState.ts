@@ -13,9 +13,11 @@ import { useEffect, useState } from "react";
 export interface AuthSnapshot {
   loginRequired: boolean;
   username: string;
+  /** Public read-only showcase: the backend rejects writes, so the UI hides the controls for them. */
+  demoMode: boolean;
 }
 
-let snapshot: AuthSnapshot = { loginRequired: true, username: "" };
+let snapshot: AuthSnapshot = { loginRequired: true, username: "", demoMode: false };
 const listeners = new Set<(value: AuthSnapshot) => void>();
 
 export function publishAuthSnapshot(patch: Partial<AuthSnapshot>) {

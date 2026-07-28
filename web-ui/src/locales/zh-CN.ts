@@ -653,6 +653,14 @@ const dict: Record<string, string> = {
   "Free software under": "自由软件，许可协议",
   "Source code": "源代码",
   "AsterMem is free software licensed under {license}. You are entitled to the complete corresponding source code.": "AsterMem 是自由软件，依据 {license} 协议授权。你有权获取完整的对应源代码。",
+  "Demo": "演示",
+  "Read-only": "只读",
+  "Have a look around.": "随便看看。",
+  "This is a read-only demo with a sample library. Nothing you do here is saved. Run your own instance to keep your memories.": "这是一个只读演示，内含示例数据。你在这里的任何操作都不会被保存。想长期保存记忆，请自行部署一套。",
+  "Run it on your own machine": "部署到你自己的机器上",
+  "AsterMem is free software. Clone the repository, start it with one command, and your memories never leave your disk.": "AsterMem 是自由软件。克隆仓库，一条命令启动，你的记忆永远不会离开自己的磁盘。",
+  "Browse the sample library and pull content back with semantic search.": "浏览示例库，用语义搜索把内容找回来。",
+  "Why original text is the only truth, and how retrieval navigates it.": "为什么原文才是唯一事实，以及检索如何在其中导航。",
 };
 
 export default dict;

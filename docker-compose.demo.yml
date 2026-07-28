@@ -1,0 +1,21 @@
+# Public read-only demo (mem.asterove.com): docker compose -f docker-compose.demo.yml up -d
+#
+# Two independent guarantees that visitor content never persists:
+#   1. ASTERMEM_DEMO_MODE rejects every write request before it reaches a handler
+#   2. /app/data is tmpfs, so anything that slips through lives in RAM and dies with the container
+# The library is reseeded from the built-in English samples on each cold start.
+#
+# The port binds to localhost only; Caddy terminates TLS and proxies to it.
+services:
+  astermem:
+    build: .
+    image: astermem:latest
+    container_name: astermem-demo
+    environment:
+      ASTERMEM_DEMO_MODE: "1"
+    ports:
+      - "127.0.0.1:8768:8768"
+    tmpfs:
+      # size caps RAM usage; noexec/nosuid harden a directory that holds uploaded files
+      - /app/data:rw,size=512m,mode=1777,noexec,nosuid
+    restart: unless-stopped

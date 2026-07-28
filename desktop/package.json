@@ -1,0 +1,13 @@
+{
+  "name": "astermem-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build-sidecar": "echo 'Run pyinstaller from repo root — see README.md'"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -76,10 +76,8 @@ config.yaml
 config.yaml.bak
 backups/
 
-# Internal design docs. docs/methodology/ is excluded from this rule: the Methodology page
-# and GET /api/methodology read those files at runtime, and the Docker build copies them in.
-docs/*
-!docs/methodology/
+# Internal design docs (PRDs, specs, architecture notes — not shipped)
+docs/internal/
 
 # Editor / agent workspace
 .cursor/

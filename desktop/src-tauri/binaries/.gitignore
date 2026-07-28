@@ -1,0 +1,2 @@
+# PyInstaller sidecar binaries (built locally or in CI)
+astermem-server*

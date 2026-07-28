@@ -138,6 +138,38 @@ def test_flag_defaults_to_off(monkeypatch):
     assert is_demo_mode() is False
 
 
+def test_demo_graph_is_grounded_in_the_sample_library():
+    """
+    The graph is hand-written because no LLM extracts it in demo mode, so nothing checks it at
+    runtime. An edge pointing at an undeclared entity, or a fact attributed to a memory that does
+    not exist, would render as a broken or invented graph on the public page.
+    """
+    from memory.auth import SAMPLE_MEMORIES_EN
+    from memory.demo_graph import (
+        DEMO_ENTITIES,
+        DEMO_EVENTS,
+        DEMO_RELATIONS,
+        DEMO_RELATIVE_EVENTS,
+    )
+
+    sample_titles = {sample["title"] for sample in SAMPLE_MEMORIES_EN}
+    declared = {(name, kind) for group in DEMO_ENTITIES.values() for name, kind, _, _ in group}
+
+    assert set(DEMO_ENTITIES) <= sample_titles, "entities attached to a non-existent memory"
+
+    for subject, subject_type, _relation, obj, object_type, source in DEMO_RELATIONS:
+        assert (subject, subject_type) in declared, f"undeclared subject {subject}"
+        assert (obj, object_type) in declared, f"undeclared object {obj}"
+        assert source in sample_titles, f"relation cites a non-existent memory: {source}"
+
+    for source, month, day, *_ in DEMO_EVENTS:
+        assert source in sample_titles, f"event cites a non-existent memory: {source}"
+        assert 1 <= month <= 12 and 1 <= day <= 28, f"unsafe date {month}-{day}"
+
+    for source, *_ in DEMO_RELATIVE_EVENTS:
+        assert source in sample_titles, f"event cites a non-existent memory: {source}"
+
+
 def test_demo_mode_yields_no_chat_model(monkeypatch):
     """
     Every LLM caller goes through get_chat_model, so returning None there is what guarantees a

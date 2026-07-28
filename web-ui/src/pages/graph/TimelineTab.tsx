@@ -12,6 +12,7 @@ import { IconTrash } from "@tabler/icons-react";
 import { EmptyState, LoadingLine } from "../../components/EmptyState";
 import { api, reportError } from "../../api";
 import { useI18n } from "../../i18n";
+import { useAuthSnapshot } from "../../authState";
 import type { TimelineEvent } from "../../types";
 
 function isoDate(offsetDays: number): string {
@@ -22,6 +23,7 @@ function isoDate(offsetDays: number): string {
 
 export function TimelineTab() {
   const { t } = useI18n();
+  const { demoMode } = useAuthSnapshot();
   const navigate = useNavigate();
   const [start, setStart] = useState(isoDate(-30));
   const [end, setEnd] = useState(isoDate(60));
@@ -114,8 +116,10 @@ export function TimelineTab() {
                   if ((e.target as HTMLElement).closest("input, button")) return;
                   navigate(`/view/${event.document_id}`);
                 }}>
-                <input type="checkbox" checked={isDone(event)} onChange={() => toggleComplete(event)}
-                  style={{ marginTop: 4, accentColor: "var(--ink)" }} aria-label={t("Mark complete")} />
+                {!demoMode && (
+                  <input type="checkbox" checked={isDone(event)} onChange={() => toggleComplete(event)}
+                    style={{ marginTop: 4, accentColor: "var(--ink)" }} aria-label={t("Mark complete")} />
+                )}
                 <div style={{ flex: 1 }}>
                   <strong style={{ fontSize: 14 }}>{eventTitle(event)}</strong>
                   {event.document_title && (
@@ -128,9 +132,11 @@ export function TimelineTab() {
                 {event.is_expired && !isDone(event) && (
                   <span className="mono-sm text-danger">{t("Expired")}</span>
                 )}
-                <button type="button" onClick={() => remove(event)} aria-label={t("Delete")} style={{ opacity: 0.5 }}>
-                  <IconTrash size={15} stroke={1.5} />
-                </button>
+                {!demoMode && (
+                  <button type="button" onClick={() => remove(event)} aria-label={t("Delete")} style={{ opacity: 0.5 }}>
+                    <IconTrash size={15} stroke={1.5} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

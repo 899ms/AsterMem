@@ -100,7 +100,45 @@ def seed_demo_library(sync_manager, database) -> Optional[int]:
         return None
 
     try:
-        return add_sample_memories(sync_manager, lang="en")
+        count = add_sample_memories(sync_manager, lang="en")
     except Exception as exc:  # noqa: BLE001
         print(f"[demo] Failed to seed sample memories: {exc}")
         return None
+
+    _seed_graph_when_chunked(database)
+    return count
+
+
+def _seed_graph_when_chunked(database, timeout_seconds: int = 90) -> None:
+    """
+    Write the demo knowledge graph once chunking has produced trunks.
+
+    Chunking runs on a background queue, so trunks do not exist yet when seeding returns and the
+    entity links have nothing to attach to. Waiting happens off the startup path so a stalled or
+    failed chunk run delays the graph instead of the whole service.
+    """
+    import threading
+    import time
+
+    from memory.demo_graph import seed_demo_graph
+
+    expected = len(database.list_memories(limit=200))
+
+    def run():
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            ready = sum(
+                1 for memory in database.list_memories(limit=200)
+                if database.get_trunks_by_document(memory.id)
+            )
+            if ready >= expected:
+                break
+            time.sleep(1)
+
+        try:
+            result = seed_demo_graph(database)
+            print(f"[demo] Seeded knowledge graph: {result}")
+        except Exception as exc:  # noqa: BLE001 - the demo still works without a graph
+            print(f"[demo] Failed to seed knowledge graph: {exc}")
+
+    threading.Thread(target=run, name="demo-graph-seed", daemon=True).start()

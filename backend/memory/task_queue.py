@@ -1294,9 +1294,9 @@ Instructions:
 - If the new entity is brand new and different from all candidates, reply "0"
 
 Criteria:
-- Different spellings of the same person/company/product should be considered the same (e.g., "Feishu" and "Lark")
-- Abbreviations and full names of the same thing should be considered the same (e.g., "ByteDance" and "字节跳动")
-- Subordinate relationships that are not the same entity should be considered different (e.g., "Lark" and "ByteDance" are different entities)
+- Different names for the same person/company/product should be considered the same (e.g., "Twitter" and "X")
+- Abbreviations and full names of the same thing should be considered the same (e.g., "IBM" and "International Business Machines")
+- Subordinate relationships that are not the same entity should be considered different (e.g., "Instagram" and "Meta" are different entities)
 
 Reply with a number only, no explanation."""
 

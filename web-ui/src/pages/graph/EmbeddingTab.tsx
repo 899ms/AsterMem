@@ -4,19 +4,30 @@
  * rotatable/zoomable 3D point cloud.
  * Design intent: Backend already outputs x/y/z 3D coordinates (PCA / t-SNE / UMAP);
  * rendered with Three.js + OrbitControls; raycaster for hover tooltips;
- * clicking a point opens the corresponding memory in a new tab. Color buckets by first tag.
+ * clicking a point opens an in-frame preview drawer (title/tags/content excerpt) instead of
+ * navigating away; the drawer links to the full memory. Color buckets by first tag.
  * Key constraint: Render loop and resources must be released in effect cleanup (renderer.dispose,
  * cancelAnimationFrame) to avoid WebGL context leaks after switching tabs;
  * data fetching and rendering are two separate effects—container isn't mounted during loading.
  */
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { IconX } from "@tabler/icons-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EmptyState, LoadingLine } from "../../components/EmptyState";
 import { Select } from "../../components/Select";
+import { Markdown } from "../../components/Markdown";
 import { api, reportError } from "../../api";
+import { unwrapMemory } from "../../normalize";
 import { useI18n } from "../../i18n";
 import type { EmbeddingPoint } from "../../types";
+
+/** Memory id behind a point; trunk points resolve to their parent document. */
+const memoryIdOf = (p: EmbeddingPoint): string => {
+  const id = String(p.document_id ?? p.memory_id ?? p.id ?? "");
+  return id.startsWith("mem_") ? id : "";
+};
 
 const CLUSTER_COLORS = ["#151613", "#8b7cff", "#a2522e", "#2d742d", "#b08a00", "#2b6cb0"];
 const PAPER = "#f1efe8";
@@ -38,11 +49,36 @@ export function EmbeddingTab() {
   const tooltipRef = useRef<HTMLDivElement>(null);
   /* Pointer type never changes during lifetime—query once at mount; touch and mouse have different picking interactions */
   const [coarsePointer] = useState(() => window.matchMedia("(pointer: coarse)").matches);
+  /* Clicking a point opens an in-chart preview drawer instead of navigating away; body is fetched on demand */
+  const [selected, setSelected] = useState<EmbeddingPoint | null>(null);
+  const [previewContent, setPreviewContent] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    setPreviewContent("");
+    if (!selected) return;
+    const docId = memoryIdOf(selected);
+    if (!docId) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    api<unknown>("GET", `/api/memories/${docId}`)
+      .then((res) => {
+        if (!cancelled) setPreviewContent(unwrapMemory(res)?.content ?? "");
+      })
+      .catch((err) => console.error("[AsterMem] preview load failed", err))
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setPoints([]);
+    setSelected(null);
 
     (async () => {
       let nextPoints: EmbeddingPoint[] = [];
@@ -70,7 +106,7 @@ export function EmbeddingTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, method]);
 
-  // Backend trunk point titles contain hardcoded Chinese "段落 N"; re-build labels here using i18n
+  // Trunk labels are rebuilt here through i18n rather than reusing the backend's title string
   const labelOf = (p: EmbeddingPoint): string => {
     if (p.document_title) {
       const n = String(Number(p.order ?? 0) + 1);
@@ -198,19 +234,16 @@ export function EmbeddingTab() {
       }
     };
 
-    // Click a point to navigate to its memory (trunk points use parent document id), opens in new tab
+    // Click a point to open the in-frame preview drawer (no navigation)
     const openPoint = (index: number) => {
       const p = points[index];
-      const docId = String(p.document_id ?? p.memory_id ?? p.id ?? "");
-      if (docId.startsWith("mem_")) {
-        window.open(`/view/${docId}`, "_blank", "noreferrer");
-      }
+      if (memoryIdOf(p)) setSelected(p);
     };
 
     /*
-     * Touch has no hover; the desktop "hover to see label → click to open" flow degrades to a blind
-     * single-tap jump. Touch uses a two-stage approach: first tap highlights and shows the label,
-     * confirm it's the desired point then tap again to open; tap empty space to dismiss the label.
+     * Touch has no hover; the desktop "hover to see label → click to preview" flow degrades to a
+     * blind single tap. Touch uses a two-stage approach: first tap highlights and shows the label,
+     * confirm it's the desired point then tap again to preview; tap empty space to dismiss.
      */
     const onClick = (event: PointerEvent) => {
       const index = pick(event);
@@ -275,8 +308,8 @@ export function EmbeddingTab() {
         {methodInfo && <span className="mono-sm muted">{methodInfo}</span>}
         <span className="mono-sm muted">
           {coarsePointer
-            ? t("Drag to rotate, pinch to zoom, tap a point twice to open it")
-            : t("Drag to rotate, scroll to zoom, click a point to open the memory")}
+            ? t("Drag to rotate, pinch to zoom, tap a point twice to preview it")
+            : t("Drag to rotate, scroll to zoom, click a point to preview it")}
         </span>
       </div>
       {loading ? (
@@ -289,6 +322,36 @@ export function EmbeddingTab() {
       ) : (
         <div className="viz-frame" ref={frameRef}>
           <div ref={tooltipRef} className="viz-tooltip" style={{ display: "none" }} />
+          {selected && (
+            <div className="entity-drawer">
+              <div className="panel-head">
+                <span className="kicker">{t("Memory")}</span>
+                <button type="button" onClick={() => setSelected(null)} aria-label={t("Close")}>
+                  <IconX size={15} stroke={1.5} />
+                </button>
+              </div>
+              <div className="panel-body" style={{ display: "grid", gap: 10 }}>
+                <strong style={{ fontSize: 15 }}>{labelOf(selected)}</strong>
+                {(selected.tags ?? []).length > 0 && (
+                  <div className="chip-row">
+                    {(selected.tags ?? []).slice(0, 6).map((tag) => (
+                      <span key={tag} className="chip">{tag}</span>
+                    ))}
+                  </div>
+                )}
+                {previewLoading ? (
+                  <p className="mono-sm muted">{t("Loading")}</p>
+                ) : previewContent ? (
+                  <div className="embedding-preview-body">
+                    <Markdown source={previewContent} />
+                  </div>
+                ) : null}
+                <Link className="btn small" to={`/view/${memoryIdOf(selected)}`}>
+                  {t("Open full memory")}
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

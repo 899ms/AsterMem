@@ -62,6 +62,10 @@ export function LandingPage() {
               <a href="#features" className="btn">
                 {t("Explore features")}
               </a>
+              <a href={SOURCE_URL} className="btn" target="_blank" rel="noreferrer">
+                <IconBrandGithub aria-hidden="true" />
+                GitHub
+              </a>
             </div>
           </div>
           <div className="landing-hero-visual" aria-label={t("AsterMem workflow preview")}>
@@ -168,10 +172,16 @@ export function LandingPage() {
         <section className="landing-final-cta">
           <span className="kicker">ASTERMEM / ASTEROVE</span>
           <h2>{t("Bring your scattered material back. Start now.")}</h2>
-          <Link to="/home" className="btn primary">
-            {t("Open AsterMem")}
-            <IconArrowRight aria-hidden="true" />
-          </Link>
+          <div className="landing-actions">
+            <Link to="/home" className="btn primary">
+              {t("Open AsterMem")}
+              <IconArrowRight aria-hidden="true" />
+            </Link>
+            <a href={SOURCE_URL} className="btn" target="_blank" rel="noreferrer">
+              <IconBrandGithub aria-hidden="true" />
+              GitHub
+            </a>
+          </div>
         </section>
       </main>
 

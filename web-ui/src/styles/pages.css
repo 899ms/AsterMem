@@ -2458,6 +2458,12 @@
   line-height: 1;
 }
 
+/* The heading already supplies the gap; flex containers do not collapse the row's own margin. */
+.landing-final-cta .landing-actions {
+  margin-top: 0;
+  justify-content: center;
+}
+
 .landing-footer {
   display: flex;
   justify-content: space-between;

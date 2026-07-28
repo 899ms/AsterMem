@@ -2113,14 +2113,18 @@ button.home-ai-banner.deploy {
 }
 
 .landing-nav {
-  position: relative;
-  z-index: 10;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   display: flex;
   min-height: 72px;
   align-items: center;
   justify-content: space-between;
   padding: 0 clamp(24px, 5vw, 72px);
   border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .landing-logo {

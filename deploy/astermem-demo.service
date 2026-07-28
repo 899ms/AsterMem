@@ -12,6 +12,9 @@ Type=exec
 WorkingDirectory=/opt/astermem
 Environment=ASTERMEM_DEMO_MODE=1
 Environment=ASTERMEM_PORT=8768
+# Caddy is the only way in; binding to loopback stops visitors from reaching the
+# origin on :8768 and skipping TLS and the proxy's security headers.
+Environment=ASTERMEM_HOST=127.0.0.1
 # config.yaml lives on the tmpfs too: ProtectSystem=strict makes the checkout read-only,
 # and regenerating defaults each boot is exactly what a demo wants.
 Environment=ASTERMEM_CONFIG=/opt/astermem/data/config.yaml

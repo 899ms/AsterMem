@@ -431,11 +431,15 @@ def main():
     resume_incomplete_rebuild()
 
     port = config["server"]["port"]
+    # ASTERMEM_HOST: behind a reverse proxy the app should bind to loopback, otherwise the
+    # origin stays reachable on its raw port and visitors can bypass TLS and the proxy's headers.
+    # Defaults to all interfaces so a plain local install is still reachable from other devices.
+    host = os.environ.get("ASTERMEM_HOST") or "0.0.0.0"
     print("\nAsterMem is running")
     print(f"  Web UI : http://localhost:{port}")
     print(f"  API    : http://localhost:{port}/api")
     print(f"  Agent  : POST http://localhost:{port}/api/agent/call (Bearer token)\n")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":

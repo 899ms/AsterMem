@@ -275,6 +275,7 @@ def create_app(config: dict, config_path: str, services: dict):
     from web.api_explore import init_explore_api, router as explore_router
     from web.api_profile import init_profile_api, router as profile_router
     from web.api_usage import init_usage_api, router as usage_router
+    from web.scan_guard import ScanGuard, ScanGuardMiddleware
 
     init_api(services["sync_manager"], services["search_engine"], config, config_path,
              services["auth_manager"], services["memory_tools"])
@@ -298,6 +299,11 @@ def create_app(config: dict, config_path: str, services: dict):
 
     api_logger = services["api_logger"]
     demo_mode = is_demo_mode()
+
+    # On by default: an instance reachable from the internet is the case that needs it, and one
+    # reachable only on a LAN exempts its whole address range anyway, so it costs nothing there.
+    scan_guard = ScanGuard()
+    scan_guard_enabled = os.environ.get("ASTERMEM_SCAN_GUARD", "1").strip().lower() not in ("0", "false", "no")
 
     class APILogMiddleware(BaseHTTPMiddleware):
         """API call logging: provides data for /logs page, excludes streaming and self-referencing paths"""
@@ -390,6 +396,9 @@ def create_app(config: dict, config_path: str, services: dict):
     # reach any handler.
     if demo_mode:
         app.add_middleware(DemoReadOnlyMiddleware)
+    # Outermost of the three: a refused probe should cost nothing, not a log write.
+    if scan_guard_enabled:
+        app.add_middleware(ScanGuardMiddleware, guard=scan_guard)
     app.include_router(api_router)
     app.include_router(explore_router)
     app.include_router(profile_router)

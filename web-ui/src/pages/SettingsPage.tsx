@@ -362,9 +362,12 @@ export function SettingsPage() {
   const indexedMemories = statusNumber("memory_vectorized_count");
   const totalTrunks = statusNumber("total_trunks");
   const indexedTrunks = statusNumber("vectorized_count");
-  const indexReady = statusFlag("vector_store_available")
-    && indexedMemories >= totalMemories
-    && indexedTrunks >= totalTrunks;
+  // Segments still being summarised get their vectors automatically once they finish, and a
+  // rebuild skips them on purpose. Treating them as a shortfall told users to rebuild for hours
+  // during an import, at the cost of re-embedding everything, without moving the number.
+  const processingTrunks = statusNumber("processing_trunks");
+  const needsRebuild = statusFlag("needs_rebuild");
+  const indexReady = statusFlag("vector_store_available") && !needsRebuild && processingTrunks === 0;
 
   return (
     <Layout
@@ -476,7 +479,11 @@ export function SettingsPage() {
                       </div>
                     </div>
                     <p className={`vector-status-message ${indexReady ? "text-ok" : "muted"}`}>
-                      {indexReady ? t("Vector index is ready") : t("Vector index needs rebuilding")}
+                      {indexReady
+                        ? t("Vector index is ready")
+                        : needsRebuild
+                          ? t("Vector index needs rebuilding")
+                          : t("Still processing segments; they are indexed automatically as they finish")}
                     </p>
                   </div>
                 )}

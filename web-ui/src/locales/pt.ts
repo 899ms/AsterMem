@@ -354,6 +354,7 @@ const dict: Record<string, string> = {
   "No segments yet": "Nenhum trecho ainda",
   "Vector index is ready": "Índice vetorial pronto para uso",
   "Vector index needs rebuilding": "O índice vetorial precisa ser reconstruído",
+  "Still processing segments; they are indexed automatically as they finish": "Os segmentos ainda estão sendo processados; são indexados automaticamente ao concluir",
   "Rebuild index": "Reconstruir índice",
   "Rebuild vector index": "Reconstruir índice vetorial",
   "Changing the embedding provider requires rebuilding the vector index for all memories. This may take a while.": "Trocar o provedor de embedding exige reconstruir o índice vetorial de todas as memórias. Isso pode levar algum tempo.",

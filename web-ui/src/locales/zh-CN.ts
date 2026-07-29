@@ -354,6 +354,7 @@ const dict: Record<string, string> = {
   "No segments yet": "暂无分段",
   "Vector index is ready": "向量索引已可使用",
   "Vector index needs rebuilding": "需要重建向量索引",
+  "Still processing segments; they are indexed automatically as they finish": "分段仍在处理中，完成后会自动建立索引",
   "Rebuild index": "重建索引",
   "Rebuild vector index": "重建向量索引",
   "Changing the embedding provider requires rebuilding the vector index for all memories. This may take a while.": "更换 Embedding 服务商后，需要为所有记忆重建向量索引，可能耗时较长。",

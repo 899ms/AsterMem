@@ -354,6 +354,7 @@ const dict: Record<string, string> = {
   "No segments yet": "아직 문단 없음",
   "Vector index is ready": "벡터 인덱스를 사용할 수 있어요",
   "Vector index needs rebuilding": "벡터 인덱스를 다시 만들어야 해요",
+  "Still processing segments; they are indexed automatically as they finish": "세그먼트를 처리하고 있어요. 완료되는 대로 자동으로 색인됩니다",
   "Rebuild index": "인덱스 재구축",
   "Rebuild vector index": "벡터 인덱스 재구축",
   "Changing the embedding provider requires rebuilding the vector index for all memories. This may take a while.": "임베딩 프로바이더를 바꾸면 모든 기억의 벡터 인덱스를 다시 만들어야 해요. 시간이 걸릴 수 있어요.",

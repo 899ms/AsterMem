@@ -2495,6 +2495,15 @@ async def get_vector_status(admin_id: int = Depends(verify_session)):
         # Not vectorized = active trunks - vectorized
         not_vectorized_ids = all_trunk_ids - vectorized_ids
         not_vectorized_count = len(not_vectorized_ids)
+
+        # A trunk only becomes eligible for a vector once it is "ready": _run_rebuild_task skips
+        # the rest by design, so counting them as a shortfall reports a problem that rebuilding
+        # cannot fix. During a large import most trunks sit at "pending" for hours, which is why
+        # these two totals have to be reported separately rather than as one deficit.
+        ready_trunk_ids = {t.id for t in all_trunks if t.status == "ready"}
+        ready_trunks = len(ready_trunk_ids)
+        processing_trunks = total_trunks - ready_trunks
+        ready_not_vectorized_count = len(ready_trunk_ids - vector_trunk_ids)
         
         # Orphan vectors = exist in vector store but trunk no longer exists
         orphan_ids = vector_trunk_ids - all_trunk_ids
@@ -2535,6 +2544,16 @@ async def get_vector_status(admin_id: int = Depends(verify_session)):
             "not_vectorized_count": not_vectorized_count,
             "orphan_count": orphan_count,
             "vectorized_percent": round(vectorized_count / total_trunks * 100, 1) if total_trunks > 0 else 0,
+            # Split of the shortfall above, so a library that is merely still being ingested is
+            # not reported the same way as one whose vectors are genuinely missing.
+            "ready_trunks": ready_trunks,
+            "processing_trunks": processing_trunks,
+            "ready_not_vectorized_count": ready_not_vectorized_count,
+            # Derived here rather than in the UI: the rule depends on what a rebuild actually
+            # covers, which is a property of this module.
+            "needs_rebuild": bool(search.vector_store) and (
+                memory_not_vectorized_count > 0 or ready_not_vectorized_count > 0
+            ),
             # Document-level statistics (backward compatible with old UI)
             "total_memories": total_memories,
             "docs_with_trunks": docs_with_trunks,

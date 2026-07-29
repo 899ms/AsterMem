@@ -354,6 +354,7 @@ const dict: Record<string, string> = {
   "No segments yet": "チャンクはまだありません",
   "Vector index is ready": "ベクトルインデックスは利用可能です",
   "Vector index needs rebuilding": "ベクトルインデックスの再構築が必要です",
+  "Still processing segments; they are indexed automatically as they finish": "セグメントを処理中です。完了したものから自動的にインデックスされます",
   "Rebuild index": "インデックスを再構築",
   "Rebuild vector index": "ベクトルインデックスを再構築",
   "Changing the embedding provider requires rebuilding the vector index for all memories. This may take a while.": "エンベディングプロバイダーを変更すると、すべてのメモリのベクトルインデックスを再構築する必要があります。時間がかかる場合があります。",

@@ -37,7 +37,7 @@ scripts/astermem.sh delete <mem_id>                # soft delete (archive)
 scripts/astermem.sh list [status] [limit]
 scripts/astermem.sh tags "tag1,tag2" [limit]
 scripts/astermem.sh stats
-scripts/astermem.sh config                           # redacted provider and search configuration
+scripts/astermem.sh config [--catalog]               # redacted provider and search configuration; --catalog adds every selectable provider
 scripts/astermem.sh provider <id> '<json_patch>'     # create or update a provider
 scripts/astermem.sh test-provider <id>
 scripts/astermem.sh rebuild                          # start vector rebuild after explicit confirmation
@@ -48,11 +48,21 @@ scripts/astermem.sh call <tool> '<json>'           # any other tool, see referen
 
 On Windows run the same commands through PowerShell, e.g. `powershell -ExecutionPolicy Bypass -File scripts/astermem.ps1 quick "<text>"`.
 
+### When a reply is unreadable
+
+Re-running a read command never changes its answer, so treat an unusable reply as a signal to change approach rather than to retry:
+
+- **Fields came back `null`** — assume a wrong key path before assuming the service is unconfigured. These replies are nested; print the top-level keys once to see the real shape, or check it in [reference.md](reference.md). Do not re-run the same extraction.
+- **Output was withheld, truncated or flagged as bulk data by your host** — reduce it at the source instead of reformatting the same payload: drop `--catalog`, lower `limit`, or fetch one id. Piping through `head`, `jq` or a Python script still asks for the same oversized reply.
+- **Still stuck after two different attempts** — stop and tell the user which command failed and how. Do not keep trying variations silently.
+
+Searching again with different keywords is a separate matter and is encouraged; see Memory rules below.
+
 ## Configure AsterMem for the user
 
 When the user asks to connect a model or set up AsterMem:
 
-1. Run `config`. Inspect added providers and `provider_catalog`.
+1. Run `config` and read `active`, `providers` and `provider_catalog_ids`. That is enough to see what is set up and which ids are selectable; add `--catalog` only when you need each entry's base URL and default models.
 2. Ask only for missing facts: provider, base URL, embedding model, chat model and API key.
 3. Call `provider`. Example:
 

@@ -21,7 +21,7 @@
 #   astermem.sh tags "<tag1,tag2>" [limit]        # list memories by tags
 #   astermem.sh stats
 #   astermem.sh profile [core|standard|full]      # one-call user profile (fields + AI claims)
-#   astermem.sh config
+#   astermem.sh config [--catalog]                # --catalog adds every selectable provider
 #   astermem.sh provider <id> '<json_patch>'
 #   astermem.sh test-provider <id>
 #   astermem.sh rebuild
@@ -186,7 +186,11 @@ print(json.dumps({"tags": [t.strip() for t in sys.argv[1].split(",") if t.strip(
     args=$(python3 -c 'import json,sys; print(json.dumps({"level": sys.argv[1]}))' "$level")
     call_agent get_profile "$args" ;;
   config)
-    call_agent get_system_config '{}' ;;
+    if [ "${1:-}" = "--catalog" ]; then
+      call_agent get_system_config '{"include_catalog":true}'
+    else
+      call_agent get_system_config '{}'
+    fi ;;
   provider)
     id="${1:?usage: astermem.sh provider <id> '<json_patch>'}"
     patch="${2:-\{\}}"

@@ -213,8 +213,17 @@ def _save_config():
         raise HTTPException(status_code=500, detail=f"Failed to save config: {e}")
 
 
-def _config_view() -> dict:
-    """Return a sanitized config view suitable for the web UI or Agent."""
+def _config_view(include_catalog: bool = True) -> dict:
+    """
+    Return a sanitized config view suitable for the web UI or Agent.
+
+    The settings page needs the whole built-in catalog to render its provider picker, but an agent
+    asking "is this configured?" does not: two dozen catalog entries with seven identical fields
+    each is the bulk of this payload, it costs context on every routine check, and agent hosts that
+    screen tool output for bulk tabular data withhold the reply outright, leaving the agent retrying
+    a call it can never read. Callers that only need the active selection pass include_catalog=False
+    and get a flat id list instead, which stays useful for picking a provider without the bulk.
+    """
     from memory.providers import PROVIDER_CATALOG, normalize_config, resolve_api_key
 
     normalize_config(_config)
@@ -230,21 +239,26 @@ def _config_view() -> dict:
             "chat_model": entry.get("chat_model", ""),
             "has_api_key": bool(resolve_api_key(entry)) or not entry.get("api_key_env"),
         }
-    catalog_view = {
-        pid: {
-            "name": entry.get("name", pid),
-            "category": entry.get("category", "other"),
-            "api_type": entry.get("api_type", "openai_compatible"),
-            "base_url": entry.get("base_url", ""),
-            "api_key_env": entry.get("api_key_env", ""),
-            "embedding_model": entry.get("embedding_model", ""),
-            "chat_model": entry.get("chat_model", ""),
+    if include_catalog:
+        catalog_field = {
+            "provider_catalog": {
+                pid: {
+                    "name": entry.get("name", pid),
+                    "category": entry.get("category", "other"),
+                    "api_type": entry.get("api_type", "openai_compatible"),
+                    "base_url": entry.get("base_url", ""),
+                    "api_key_env": entry.get("api_key_env", ""),
+                    "embedding_model": entry.get("embedding_model", ""),
+                    "chat_model": entry.get("chat_model", ""),
+                }
+                for pid, entry in PROVIDER_CATALOG.items()
+            }
         }
-        for pid, entry in PROVIDER_CATALOG.items()
-    }
+    else:
+        catalog_field = {"provider_catalog_ids": sorted(PROVIDER_CATALOG)}
     return {
         "providers": providers_view,
-        "provider_catalog": catalog_view,
+        **catalog_field,
         "active": _config.get("active", {}),
         "search": {
             "semantic": {
@@ -2989,7 +3003,9 @@ async def call_agent_tool(request: Request):
                 with_sources=bool(arguments.get("with_sources")),
             )
         elif tool_name == "get_system_config":
-            result = _config_view()
+            result = _config_view(
+                include_catalog=bool(arguments.get("include_catalog"))
+            )
         elif tool_name == "configure_provider":
             provider_id = str(arguments.get("provider_id") or "").strip().lower()
             if not provider_id:
@@ -3019,7 +3035,11 @@ async def call_agent_tool(request: Request):
                 min_similarity=arguments.get("min_similarity"),
             )
             applied = _apply_config_update(update)
-            result = {**applied, "provider_id": provider_id, "config": _config_view()}
+            result = {
+                **applied,
+                "provider_id": provider_id,
+                "config": _config_view(include_catalog=False),
+            }
         elif tool_name == "test_provider":
             provider_id = str(arguments.get("provider_id") or "").strip().lower()
             if not provider_id:

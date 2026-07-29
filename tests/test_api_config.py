@@ -143,3 +143,49 @@ def test_provider_test_endpoint_unknown(client):
     resp = client.post("/api/providers/ghost/test")
     assert resp.status_code == 200
     assert resp.json()["success"] is False
+
+
+def _agent_config(client, api_token, arguments=None):
+    resp = client.post(
+        "/api/agent/call",
+        json={"tool": "get_system_config", "arguments": arguments or {}},
+        headers={"Authorization": f"Bearer {api_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["result"]
+
+
+def test_agent_config_omits_catalog_by_default(client, api_token):
+    """
+    The agent channel must not ship the full catalog unasked. Two dozen records with identical
+    fields is the bulk of this payload and hosts that screen tool output for bulk tabular data
+    withhold the whole reply, which strands the agent retrying a call it can never read.
+    """
+    result = _agent_config(client, api_token)
+    assert "provider_catalog" not in result
+    assert {"anthropic", "openai", "dashscope"} <= set(result["provider_catalog_ids"])
+    # Everything needed to answer "is this configured?" survives the trim.
+    assert "embedding_provider" in result["active"]
+    assert "enabled" in result["search"]["semantic"]
+    assert result["providers"]
+
+
+def test_agent_config_catalog_is_opt_in(client, api_token):
+    result = _agent_config(client, api_token, {"include_catalog": True})
+    assert {"anthropic", "openai", "dashscope"} <= set(result["provider_catalog"])
+    assert "provider_catalog_ids" not in result
+
+
+def test_agent_config_documented_paths_are_not_null(client, api_token):
+    """
+    Guards the key paths reference.md tells agents to read. A rename that leaves these resolving to
+    None is what sent one agent into a 60-call retry loop: a wrong path is indistinguishable from an
+    unconfigured service, so it never learns to look elsewhere.
+    """
+    result = _agent_config(client, api_token)
+    assert result["active"]["embedding_provider"] is not None
+    assert result["search"]["semantic"]["enabled"] is not None
+    assert result["search"]["semantic"]["min_similarity"] is not None
+    # These live in get_memory_stats; reference.md must keep pointing agents there for them.
+    assert "memory_count" not in result
+    assert "vector_index_built" not in result

@@ -22,7 +22,7 @@
       astermem.ps1 tags "<tag1,tag2>" [limit]        # list memories by tags
       astermem.ps1 stats
       astermem.ps1 profile [core|standard|full]      # one-call user profile (fields + AI claims)
-      astermem.ps1 config
+      astermem.ps1 config [--catalog]                # --catalog adds every selectable provider
       astermem.ps1 provider <id> '<json_patch>'
       astermem.ps1 test-provider <id>
       astermem.ps1 rebuild
@@ -53,7 +53,7 @@ astermem.ps1 list [status] [limit]
 astermem.ps1 tags "<tag1,tag2>" [limit]        # list memories by tags
 astermem.ps1 stats
 astermem.ps1 profile [core|standard|full]      # one-call user profile (fields + AI claims)
-astermem.ps1 config
+astermem.ps1 config [--catalog]                # --catalog adds every selectable provider
 astermem.ps1 provider <id> '<json_patch>'
 astermem.ps1 test-provider <id>
 astermem.ps1 rebuild
@@ -230,7 +230,11 @@ switch ($Command) {
         Invoke-AgentTool "get_profile" @{ level = (Get-Arg 0 "standard") }
     }
     "config" {
-        Invoke-AgentTool "get_system_config" @{}
+        if ((Get-Arg 0 "") -eq "--catalog") {
+            Invoke-AgentTool "get_system_config" @{ include_catalog = $true }
+        } else {
+            Invoke-AgentTool "get_system_config" @{}
+        }
     }
     "provider" {
         $id = Get-Arg 0 -Required "usage: astermem.ps1 provider <id> '<json_patch>'"

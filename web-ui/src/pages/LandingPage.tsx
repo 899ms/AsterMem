@@ -205,7 +205,7 @@ export function LandingPage() {
           {" · "}
           <a href={SOURCE_URL} target="_blank" rel="noreferrer">{t("Source code")}</a>
         </span>
-        <span>© 2026 ASTEROVE</span>
+        <a href="https://asterove.com" target="_blank" rel="noreferrer">© 2026 ASTEROVE</a>
       </footer>
     </div>
   );

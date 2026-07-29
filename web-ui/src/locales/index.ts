@@ -3,7 +3,8 @@
  * for per-language maintenance and parallel translation by multiple people (or agents).
  * Design intent: English is the source language and doesn't need a dictionary; when t() can't find an entry
  * it falls back to the English original, so a missing translation only locally degrades to English, never crashes.
- * Key constraint: All language files' keys must match zh-CN.ts (validated by scripts/check-i18n.mjs); no emoji.
+ * Key constraint: All language files must carry the same key set (validated by scripts/check-i18n.mjs
+ * against the union of every locale, so no single translation is authoritative); no emoji.
  */
 import en from "./en";
 import ko from "./ko";

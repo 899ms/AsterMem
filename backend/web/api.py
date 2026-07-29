@@ -562,7 +562,7 @@ async def download_astermem_skill(admin_id: int = Depends(verify_session)):
 
 
 @router.get("/methodology")
-async def get_methodology(lang: str = "zh-CN"):
+async def get_methodology(lang: str = "en"):
     """
     Public methodology introduction content: reads and serves docs/methodology/{lang}.md.
     This endpoint intentionally does not require authentication so the public landing page

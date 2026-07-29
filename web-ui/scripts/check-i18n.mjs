@@ -1,5 +1,8 @@
-// i18n key integrity check: uses zh-CN.ts as the baseline, compares key sets across the other
-// locale files, and reports missing/extra keys plus entries with mismatched {var} placeholders.
+// i18n key integrity check. Keys are the English source strings, so no translated dictionary is
+// authoritative: the reference key set is the union of every locale, and a key missing from one file
+// is reported against it. That also means a typo'd key surfaces as "missing in the other nine"
+// rather than silently becoming the baseline, which is what happened while one language held that
+// role. en.ts is excluded because English needs no entries — t() falls back to the key.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -17,24 +20,22 @@ function loadDict(lang) {
 const placeholders = (text) =>
   [...String(text).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
 
-const base = loadDict("zh-CN");
-const baseKeys = new Set(Object.keys(base));
+const dicts = new Map(LANGS.map((lang) => [lang, loadDict(lang)]));
+const reference = new Set(LANGS.flatMap((lang) => Object.keys(dicts.get(lang))));
 let failed = false;
 
-for (const lang of LANGS.slice(1)) {
-  const dict = loadDict(lang);
+for (const lang of LANGS) {
+  const dict = dicts.get(lang);
   const keys = new Set(Object.keys(dict));
-  const missing = [...baseKeys].filter((k) => !keys.has(k));
-  const extra = [...keys].filter((k) => !baseKeys.has(k));
+  const missing = [...reference].filter((k) => !keys.has(k));
   const badVars = [...keys].filter(
-    (k) => baseKeys.has(k) && placeholders(k) !== placeholders(dict[k]) && placeholders(k) !== "",
+    (k) => placeholders(k) !== placeholders(dict[k]) && placeholders(k) !== "",
   );
   const emoji = [...keys].filter((k) => /\p{Extended_Pictographic}/u.test(dict[k]));
-  if (missing.length || extra.length || badVars.length || emoji.length) {
+  if (missing.length || badVars.length || emoji.length) {
     failed = true;
     console.log(`\n=== ${lang} ===`);
     if (missing.length) console.log(`  ${missing.length} missing keys:`, missing.slice(0, 10));
-    if (extra.length) console.log(`  ${extra.length} extra keys:`, extra.slice(0, 10));
     if (badVars.length) console.log(`  ${badVars.length} keys with mismatched placeholders:`, badVars.slice(0, 10));
     if (emoji.length) console.log(`  ${emoji.length} keys containing emoji:`, emoji.slice(0, 10));
   } else {
@@ -42,4 +43,5 @@ for (const lang of LANGS.slice(1)) {
   }
 }
 
+console.log(`\nreference key set: ${reference.size} keys (union of ${LANGS.length} locales)`);
 process.exit(failed ? 1 : 0);

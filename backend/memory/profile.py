@@ -35,23 +35,25 @@ from . import output_language
 from .profile_audit import ProfileAuditor, parse_json_block
 
 # L1 required + L2 optional field schema. key is stable identifier, label is for UI display.
+# Labels and hints double as i18n keys: the frontend calls t(def.label), and every locale file keys
+# these entries on the exact strings below, so editing one here means editing web-ui/src/locales/*.ts.
 FIELD_SCHEMA = [
-    {"key": "nickname", "label": "Nickname", "required": True,
-     "hint": "How you want AI to address you"},
+    {"key": "nickname", "label": "Preferred name", "required": True,
+     "hint": "What the AI should call you"},
     {"key": "gender", "label": "Gender", "required": True, "hint": ""},
-    {"key": "language", "label": "Primary Language", "required": True,
-     "hint": "e.g. Chinese / English"},
-    {"key": "timezone", "label": "Timezone", "required": True,
-     "hint": "e.g. Asia/Shanghai"},
+    {"key": "language", "label": "Languages", "required": True,
+     "hint": "e.g. English, Spanish"},
+    {"key": "timezone", "label": "Time zone", "required": True,
+     "hint": "e.g. America/New_York"},
     {"key": "occupation", "label": "Occupation", "required": False, "hint": ""},
     {"key": "location", "label": "Location", "required": False, "hint": ""},
-    {"key": "organization", "label": "Organization / Team", "required": False, "hint": ""},
-    {"key": "focus", "label": "Current Focus", "required": False,
-     "hint": "Projects or areas you are currently working on"},
-    {"key": "preferences", "label": "Communication Preferences", "required": False,
-     "hint": "e.g. keep answers concise, code comments in Chinese"},
-    {"key": "taboos", "label": "Taboos / Avoid", "required": False,
-     "hint": "Things you don't want AI to do"},
+    {"key": "organization", "label": "Organization / team", "required": False, "hint": ""},
+    {"key": "focus", "label": "Current focus", "required": False,
+     "hint": "Projects or areas you are working on"},
+    {"key": "preferences", "label": "Communication preferences", "required": False,
+     "hint": "e.g. keep answers concise"},
+    {"key": "taboos", "label": "Things to avoid", "required": False,
+     "hint": "Things you do not want the AI to do"},
 ]
 
 _TIER_LABELS = {"core": "Core Traits", "recent": "Recent", "map": "Topic Map"}
@@ -274,7 +276,7 @@ class ProfileService:
         fields = self.get_fields()
         current = fields["values"]
         schema_desc = "\n".join(
-            f"- {f['key']}（{f['label']}）：{f['hint'] or ''}" for f in FIELD_SCHEMA
+            f"- {f['key']} ({f['label']}): {f['hint'] or ''}" for f in FIELD_SCHEMA
         )
         prompt = (
             "TASK: Profile field suggestions. You are helping fill in user profile fields. "

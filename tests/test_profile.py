@@ -174,7 +174,7 @@ def test_fields_appear_in_profile_even_when_disabled(client, profile_env):
         resp = client.get("/api/profile")
         assert resp.status_code == 200
         text = resp.json()["profile"]
-        assert "Alex" in text or "Nickname" in text  # Field layer does not depend on enabled
+        assert "Alex" in text or "Preferred name" in text  # Field layer does not depend on enabled
         assert resp.json()["enabled"] is False
     finally:
         config["profile"]["enabled"] = True

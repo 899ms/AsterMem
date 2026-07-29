@@ -15,7 +15,7 @@ def get_current_time(timezone: Optional[str] = None) -> dict:
     Get the current time
     
     Args:
-        timezone: Timezone name, e.g. "Asia/Shanghai", "America/New_York"
+        timezone: IANA timezone name, e.g. "UTC", "America/New_York", "Asia/Tokyo"
     
     Returns:
         A dictionary containing time information
@@ -43,7 +43,7 @@ def get_current_time(timezone: Optional[str] = None) -> dict:
         return {
             "success": False,
             "error": f"Unknown timezone '{timezone}'",
-            "message": f"Error: Unknown timezone '{timezone}'. Please use a valid timezone name such as 'Asia/Shanghai', 'America/New_York', etc."
+            "message": f"Error: Unknown timezone '{timezone}'. Please use a valid IANA timezone name such as 'UTC', 'America/New_York' or 'Asia/Tokyo'."
         }
 
 
@@ -98,7 +98,7 @@ def convert_timezone(time_str: str, from_timezone: str, to_timezone: str) -> dic
         return {
             "success": False,
             "error": f"Unknown timezone: {str(e)}",
-            "message": "Error: Unknown timezone. Please verify the timezone name. Common timezones: Asia/Shanghai, America/New_York, Europe/London, Asia/Tokyo"
+            "message": "Error: Unknown timezone. Please verify the timezone name. Common timezones: UTC, America/New_York, Europe/London, Asia/Tokyo"
         }
 
 
@@ -112,22 +112,26 @@ def list_timezones(region: Optional[str] = None) -> dict:
     Returns:
         A dictionary containing the timezone list
     """
+    # Labelled by city alone, ordered west to east by standard offset, which is how timezone
+    # pickers are conventionally read. Deliberately no country or territory attribution: it adds
+    # nothing to choosing a zone, several entries would need a stance on contested naming, and the
+    # IANA identifier beside each label already tells anyone who needs the region.
     common_timezones = {
-        "Asia/Shanghai": "China - Shanghai",
-        "Asia/Hong_Kong": "China - Hong Kong",
-        "Asia/Taipei": "China - Taipei",
-        "Asia/Tokyo": "Japan - Tokyo",
-        "Asia/Seoul": "South Korea - Seoul",
-        "Asia/Singapore": "Singapore",
-        "America/New_York": "USA - New York",
-        "America/Los_Angeles": "USA - Los Angeles",
-        "America/Chicago": "USA - Chicago",
-        "Europe/London": "UK - London",
-        "Europe/Paris": "France - Paris",
-        "Europe/Berlin": "Germany - Berlin",
-        "Australia/Sydney": "Australia - Sydney",
-        "Pacific/Auckland": "New Zealand - Auckland",
+        "America/Los_Angeles": "Los Angeles",
+        "America/Chicago": "Chicago",
+        "America/New_York": "New York",
         "UTC": "Coordinated Universal Time",
+        "Europe/London": "London",
+        "Europe/Berlin": "Berlin",
+        "Europe/Paris": "Paris",
+        "Asia/Hong_Kong": "Hong Kong",
+        "Asia/Shanghai": "Shanghai",
+        "Asia/Singapore": "Singapore",
+        "Asia/Taipei": "Taipei",
+        "Asia/Seoul": "Seoul",
+        "Asia/Tokyo": "Tokyo",
+        "Australia/Sydney": "Sydney",
+        "Pacific/Auckland": "Auckland",
     }
     
     if region:

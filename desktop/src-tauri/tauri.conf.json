@@ -47,7 +47,32 @@
     },
     "windows": {
       "wix": {
-        "language": ["en-US", "zh-CN"]
+        "language": [
+          "en-US",
+          "de-DE",
+          "es-ES",
+          "fr-FR",
+          "ja-JP",
+          "ko-KR",
+          "pt-BR",
+          "ru-RU",
+          "zh-CN",
+          "zh-TW"
+        ]
+      },
+      "nsis": {
+        "languages": [
+          "English",
+          "German",
+          "Spanish",
+          "French",
+          "Japanese",
+          "Korean",
+          "PortugueseBR",
+          "Russian",
+          "SimpChinese",
+          "TradChinese"
+        ]
       }
     }
   },

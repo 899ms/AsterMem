@@ -617,7 +617,7 @@ const dict: Record<string, string> = {
   "Things to avoid": "Temas a evitar",
   "What the AI should call you": "Cómo quieres que te llame la IA",
   "e.g. English, Spanish": "p. ej., español / English",
-  "e.g. America/New_York": "p. ej., Asia/Shanghai",
+  "e.g. America/New_York": "p. ej., America/Mexico_City",
   "Projects or areas you are working on": "Proyectos o áreas en curso",
   "e.g. keep answers concise": "p. ej., respuestas concisas, comentarios del código en español",
   "Things you do not want the AI to do": "Cosas que la IA no debe hacer",

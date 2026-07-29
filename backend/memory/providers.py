@@ -317,6 +317,10 @@ PROVIDER_CATALOG: dict = {
 DEFAULT_PROVIDER_IDS = ("builtin", "lmstudio")
 DEFAULT_PROVIDERS = {provider_id: dict(PROVIDER_CATALOG[provider_id]) for provider_id in DEFAULT_PROVIDER_IDS}
 
+#: Schema revision of the provider registry. Stamped onto a newly seeded config so the migrations
+#: below, which exist to correct older layouts, do not run against defaults built from this catalog.
+PROVIDER_CATALOG_VERSION = 3
+
 
 def normalize_config(config: dict) -> bool:
     """
@@ -329,12 +333,13 @@ def normalize_config(config: dict) -> bool:
     Return value: True means migration occurred (caller should write config file).
     """
     changed = False
+    legacy_model = config.get("model", {}) or {}
+
     if "providers" not in config:
         config["providers"] = {k: dict(v) for k, v in DEFAULT_PROVIDERS.items()}
         changed = True
 
-        old_model = config.get("model", {}) or {}
-        old_local = old_model.get("local", {}) or {}
+        old_local = legacy_model.get("local", {}) or {}
         # Legacy local section allowed custom base_url and model names; preserve user modifications during migration
         if old_local:
             lp = config["providers"]["lmstudio"]
@@ -343,19 +348,33 @@ def normalize_config(config: dict) -> bool:
             lp["chat_model"] = old_local.get("chat_model", lp["chat_model"])
             lp["vlm_model"] = old_local.get("vlm_model", lp.get("vlm_model", ""))
 
+        if not legacy_model:
+            # Seeded straight from the current catalog, so the version migrations below have nothing
+            # to correct. Without this stamp the v2 cleanup reads these defaults as legacy
+            # auto-expanded cards and drops whichever one is not selected.
+            config["provider_catalog_version"] = PROVIDER_CATALOG_VERSION
+
     if "active" not in config:
-        legacy_model = config.get("model", {}) or {}
-        mode = legacy_model.get("mode", "lmstudio")
-        mode_map = {
-            "local": "lmstudio",
-            "bailian": "dashscope",
-            "openrouter": "openrouter",
-            "googleai": "google",
-        }
-        active_id = mode_map.get(mode, mode if mode in PROVIDER_CATALOG else "lmstudio")
-        if active_id not in config["providers"] and active_id in PROVIDER_CATALOG:
-            config["providers"][active_id] = dict(PROVIDER_CATALOG[active_id])
-        config["active"] = {"embedding_provider": active_id, "chat_provider": active_id}
+        if legacy_model:
+            mode = legacy_model.get("mode", "lmstudio")
+            mode_map = {
+                "local": "lmstudio",
+                "bailian": "dashscope",
+                "openrouter": "openrouter",
+                "googleai": "google",
+            }
+            active_id = mode_map.get(mode, mode if mode in PROVIDER_CATALOG else "lmstudio")
+            if active_id not in config["providers"] and active_id in PROVIDER_CATALOG:
+                config["providers"][active_id] = dict(PROVIDER_CATALOG[active_id])
+            config["active"] = {"embedding_provider": active_id, "chat_provider": active_id}
+        else:
+            # A fresh install has no legacy mode to carry over, so nothing here knows which provider
+            # the user wants. Falling through to lmstudio aimed every model call at
+            # http://localhost:1234, which only answers on a machine already running LM Studio: a
+            # server install failed chat with "All connection attempts failed" and left the vector
+            # store unbuilt, with no message naming the provider at fault. Leaving the selection
+            # empty keeps the settings page the one place a provider gets chosen.
+            config["active"] = {"embedding_provider": "", "chat_provider": ""}
         changed = True
 
     providers = config.get("providers", {})
@@ -413,6 +432,18 @@ def normalize_config(config: dict) -> bool:
                 entry["name"] = catalog_entry["name"]
         config["provider_catalog_version"] = 3
         changed = True
+
+    # An id that is no longer in the registry cannot be built, and the settings page resends whatever
+    # selection it loaded: the save is rejected as an unknown provider every time, so the one screen
+    # that could repair the selection is the screen that cannot save. Clearing it here lets an
+    # instance already in that state recover on its next restart.
+    for key in ("embedding_provider", "chat_provider"):
+        selected = active.get(key) or ""
+        if selected and selected not in providers:
+            selected = ""
+        if active.get(key) != selected:
+            active[key] = selected
+            changed = True
 
     return changed
 
@@ -1210,7 +1241,9 @@ def get_embedding_model(config: dict) -> Optional[EmbeddingModel]:
     with logging, allowing semantic search to gracefully degrade to keyword search instead of crashing on startup.
     """
     normalize_config(config)
-    provider_id = (config.get("active") or {}).get("embedding_provider", "lmstudio")
+    provider_id = (config.get("active") or {}).get("embedding_provider", "")
+    if not provider_id:
+        return None
     entry = get_provider_entry(config, provider_id)
     if not entry:
         print(f"[providers] embedding provider '{provider_id}' not found in registry")
@@ -1233,7 +1266,9 @@ def get_chat_model(config: dict, caller: str = "chat"):
         return None
 
     normalize_config(config)
-    provider_id = (config.get("active") or {}).get("chat_provider", "lmstudio")
+    provider_id = (config.get("active") or {}).get("chat_provider", "")
+    if not provider_id:
+        return None
     entry = get_provider_entry(config, provider_id)
     if not entry:
         print(f"[providers] chat provider '{provider_id}' not found in registry")

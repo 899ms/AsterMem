@@ -20,6 +20,14 @@ from .usage_tracker import estimate_tokens, record_usage
 
 
 class AIExplorer:
+    #: Surfaced instead of a transport error when no chat provider is selected. The three public
+    #: generators below each check it: a stream that opens and then dies on connect reads as an
+    #: outage, so the reason has to arrive before any request is attempted.
+    UNCONFIGURED_DETAIL = (
+        "No chat model is configured. Open Settings, add a provider that has a chat model, "
+        "then select it for chat."
+    )
+
     def __init__(self, search_engine: SearchEngine, config: dict):
         self.search_engine = search_engine
         self.config = config
@@ -32,20 +40,27 @@ class AIExplorer:
         from .providers import normalize_config, get_provider_entry, resolve_api_key
 
         normalize_config(config)
-        provider_id = (config.get("active") or {}).get("chat_provider", "lmstudio")
+        provider_id = (config.get("active") or {}).get("chat_provider", "")
         entry = get_provider_entry(config, provider_id) or {}
         self.mode = provider_id
 
-        base_url = (entry.get("base_url") or "http://localhost:1234/v1").rstrip("/")
-        model = entry.get("chat_model") or "qwen2.5-7b-instruct"
+        # Nothing is invented when no provider is selected: standing in a localhost:1234 default made
+        # an unconfigured instance fail with "All connection attempts failed", which describes a
+        # machine that was never meant to serve a model instead of the selection that is missing.
+        base_url = (entry.get("base_url") or "").rstrip("/")
+        model = entry.get("chat_model") or ""
         if entry.get("api_type") == "gemini":
             base_url = f"{base_url}/openai" if base_url.endswith("/v1beta") else base_url
             model = model.removeprefix("models/")
         self.base_url = base_url
         self.model = model
         self.api_key = resolve_api_key(entry) or None
+        self.configured = bool(base_url and model)
 
-        print(f"[AIExplorer] Initialized: provider={provider_id}, model={self.model}")
+        if self.configured:
+            print(f"[AIExplorer] Initialized: provider={provider_id}, model={self.model}")
+        else:
+            print("[AIExplorer] No chat provider selected; exploration is unavailable until one is set")
 
     def _get_headers(self) -> dict:
         headers = {"Content-Type": "application/json"}
@@ -98,6 +113,11 @@ class AIExplorer:
         3. If needed, generates keywords for supplementary search (up to 2 rounds)
         4. Final narration
         """
+        if not self.configured:
+            yield self._event("error", "llm_error", self.UNCONFIGURED_DETAIL,
+                              detail=self.UNCONFIGURED_DETAIL)
+            return
+
         MAX_ROUNDS = 2  # Initial + 2 expansion rounds = up to 3 searches
         # When there are only 1-2 results the model still returns ENOUGH (tested with 1 result saying "sufficient"),
         # causing narration to be just a single isolated item. Below this count, "enough" is rejected and another round is forced.
@@ -401,6 +421,11 @@ Materials found:
         4. Optional Agent loop expansion
         5. Narration
         """
+        if not self.configured:
+            yield self._event("error", "llm_error", self.UNCONFIGURED_DETAIL,
+                              detail=self.UNCONFIGURED_DETAIL)
+            return
+
         trunk = self.search_engine.database.get_trunk(trunk_id)
         if not trunk:
             yield self._event("error", "trunk_missing", "Content not found")
@@ -736,6 +761,11 @@ Begin:"""
         Generate new memory based on exploration results
         Strictly reference original text, no creative writing
         """
+        if not self.configured:
+            yield self._event("error", "llm_error", self.UNCONFIGURED_DETAIL,
+                              detail=self.UNCONFIGURED_DETAIL)
+            return
+
         # Build source reference
         source_texts = "\n\n".join([
             f"[Source {i+1}: {t.get('title', 'Unknown')}]\n{t.get('content', '')}"

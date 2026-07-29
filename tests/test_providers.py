@@ -36,7 +36,10 @@ def test_normalize_config_creates_registry_and_active():
     changed = normalize_config(config)
     assert changed is True
     assert set(config["providers"].keys()) == {"builtin", "lmstudio"}
-    assert config["active"]["embedding_provider"] == "lmstudio"
+    # A fresh install selects nothing. Defaulting to lmstudio aimed every model call at
+    # localhost:1234, which only answers on a machine already running LM Studio, so a server
+    # install failed chat and indexing without naming the provider at fault.
+    assert config["active"] == {"embedding_provider": "", "chat_provider": ""}
 
 
 def test_normalize_config_migrates_old_schema():
@@ -94,6 +97,7 @@ def test_resolve_api_key_empty_env_name():
 def test_get_embedding_model_returns_correct_adapter():
     config = {}
     normalize_config(config)
+    config["active"]["embedding_provider"] = "lmstudio"
     model = get_embedding_model(config)
     assert isinstance(model, OpenAICompatibleEmbedding)
 
@@ -117,6 +121,7 @@ def test_get_embedding_model_unknown_provider_returns_none():
 def test_get_chat_model_none_when_no_chat_model():
     config = {}
     normalize_config(config)
+    config["active"]["chat_provider"] = "lmstudio"
     config["providers"]["lmstudio"]["chat_model"] = ""
     assert get_chat_model(config) is None
 
@@ -366,6 +371,58 @@ def test_configured_install_is_left_alone():
     providers.normalize_config(config)
 
     assert config["active"]["embedding_provider"] == "openrouter"
+
+
+def test_fresh_install_selects_no_provider_at_all():
+    """
+    lmstudio used to be the fallback, which pointed chat and embedding at http://localhost:1234.
+    That address only answers where LM Studio already runs, so every server install failed model
+    calls with a bare connection error and never built a vector store.
+    """
+    config = {}
+    providers.normalize_config(config)
+
+    assert config["active"] == {"embedding_provider": "", "chat_provider": ""}
+    assert providers.get_embedding_model(config) is None
+    assert providers.get_chat_model(config) is None
+
+
+def test_fresh_install_keeps_both_defaults_offered():
+    """
+    The v2 cleanup drops legacy auto-expanded cards that are unselected, unkeyed and unmodified —
+    which now describes the freshly seeded defaults themselves. A new config is stamped at the
+    current version so that cleanup cannot delete the providers the settings page offers.
+    """
+    config = {}
+    providers.normalize_config(config)
+
+    assert set(config["providers"]) == {"builtin", "lmstudio"}
+    assert config["provider_catalog_version"] == providers.PROVIDER_CATALOG_VERSION
+
+
+def test_active_selection_pointing_at_a_removed_provider_is_cleared():
+    """
+    The settings page resends the selection it loaded, so a dangling id makes every save fail as an
+    unknown provider — the one screen that could repair the choice cannot save. Clearing it on load
+    lets an instance already in that state recover by restarting.
+    """
+    config = {
+        "providers": {"builtin": dict(PROVIDER_CATALOG["builtin"])},
+        "active": {"embedding_provider": "lmstudio", "chat_provider": "lmstudio"},
+        "provider_catalog_version": providers.PROVIDER_CATALOG_VERSION,
+    }
+
+    assert providers.normalize_config(config) is True
+    assert config["active"] == {"embedding_provider": "", "chat_provider": ""}
+    assert providers.normalize_config(config) is False
+
+
+def test_legacy_upgrade_still_activates_its_migrated_provider():
+    """The empty default applies only to fresh configs; an upgrade must keep working as before."""
+    config = {"model": {"mode": "local"}}
+    providers.normalize_config(config)
+
+    assert config["active"] == {"embedding_provider": "lmstudio", "chat_provider": "lmstudio"}
 
 
 def test_built_in_embedding_loads_the_model_lazily():

@@ -42,6 +42,10 @@ def app_bundle(tmp_path_factory):
 
     from memory.providers import normalize_config
     normalize_config(config)
+    # Pinned rather than inherited: a fresh config no longer activates a provider, and several tests
+    # need the app to look configured (reading the active selection, refusing to remove it). Semantic
+    # search stays off above, so naming a provider here still reaches no network.
+    config["active"] = {"embedding_provider": "lmstudio", "chat_provider": "lmstudio"}
 
     import yaml
     with open(config_path, "w", encoding="utf-8") as f:

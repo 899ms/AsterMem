@@ -23,10 +23,11 @@ AGPL-3.0 License
 """
 
 import os
+import random
 import re
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import httpx
 
@@ -37,6 +38,10 @@ from .usage_tracker import estimate_tokens, record_usage
 _EMBEDDING_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
 _CHAT_TIMEOUT = httpx.Timeout(connect=5.0, read=60.0, write=5.0, pool=5.0)
 _POOL_LIMITS = httpx.Limits(max_connections=5, max_keepalive_connections=0, keepalive_expiry=5)
+
+_EMBEDDING_MAX_RETRIES = 3
+_RETRYABLE_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
+_MAX_RETRY_WAIT = 30.0
 
 
 # ==================== Usage parsing (unified gateway observation point) ====================
@@ -427,6 +432,31 @@ def resolve_api_key(entry: dict) -> str:
 
 # ==================== Embedding protocol adapters ====================
 
+def _embedding_retry_wait(error: Exception, attempt: int) -> Optional[float]:
+    """
+    Seconds to wait before retrying a failed embedding request, or None when the error is final.
+
+    Background: chat requests already retried, embeddings did not, so a metered upstream answering
+    a burst of vectorization threads with 429 silently lost those vectors — the memory stayed in
+    SQLite but never became searchable.
+    Design intent: only transient upstream conditions are retried, since an invalid key or an
+    unknown model fails identically a few seconds later. An upstream Retry-After hint wins over the
+    local schedule, and the jitter keeps parallel threads from colliding on the same second again.
+    """
+    if isinstance(error, httpx.HTTPStatusError):
+        if error.response.status_code not in _RETRYABLE_STATUS:
+            return None
+        hinted = error.response.headers.get("Retry-After")
+        if hinted:
+            try:
+                return min(max(float(hinted), 0.0), _MAX_RETRY_WAIT)
+            except ValueError:
+                pass
+    elif not isinstance(error, httpx.TransportError):
+        return None
+    return (attempt + 1) * 2.0 + random.uniform(0, 1)
+
+
 class EmbeddingModel:
     """Embedding model base class: vector.py and others depend on this interface for type constraints"""
 
@@ -468,27 +498,46 @@ class OpenAICompatibleEmbedding(EmbeddingModel):
                      prompt_tokens=prompt_tokens, estimated=estimated,
                      duration_ms=duration_ms, status=status, error=error)
 
-    def embed(self, text: str, caller: str = "embedding") -> List[float]:
+    def _request_embeddings(self, client: httpx.Client, payload_input: Union[str, List[str]],
+                           caller: str) -> dict:
+        """POST /embeddings, backing off on rate limits and other transient upstream failures."""
+        texts = [payload_input] if isinstance(payload_input, str) else payload_input
+        last_error: Optional[Exception] = None
         start = time.time()
-        try:
-            with httpx.Client(timeout=_EMBEDDING_TIMEOUT, limits=_POOL_LIMITS) as client:
+        for attempt in range(_EMBEDDING_MAX_RETRIES):
+            try:
                 resp = client.post(
                     f"{self.base_url}/embeddings",
                     headers=self._headers(),
-                    json={"model": self.model, "input": text},
+                    json={"model": self.model, "input": payload_input},
                 )
                 resp.raise_for_status()
                 data = resp.json()
                 prompt_tokens, _, _ = _parse_openai_usage(data)
                 estimated = prompt_tokens == 0
                 if estimated:
-                    prompt_tokens = estimate_tokens(text)
+                    prompt_tokens = sum(estimate_tokens(t) for t in texts)
                 self._record(prompt_tokens, int((time.time() - start) * 1000), caller,
                              estimated=estimated)
+                return data
+            except Exception as e:
+                last_error = e
+                wait = _embedding_retry_wait(e, attempt) if attempt < _EMBEDDING_MAX_RETRIES - 1 else None
+                if wait is None:
+                    break
+                print(f"[providers] {self.provider_name} embedding failed, retrying in {wait:.1f}s "
+                      f"({attempt + 1}/{_EMBEDDING_MAX_RETRIES}): {e}")
+                time.sleep(wait)
+        self._record(0, int((time.time() - start) * 1000), caller,
+                     status="error", error=str(last_error))
+        raise last_error
+
+    def embed(self, text: str, caller: str = "embedding") -> List[float]:
+        try:
+            with httpx.Client(timeout=_EMBEDDING_TIMEOUT, limits=_POOL_LIMITS) as client:
+                data = self._request_embeddings(client, text, caller)
                 return data["data"][0]["embedding"]
         except Exception as e:
-            self._record(0, int((time.time() - start) * 1000), caller,
-                         status="error", error=str(e))
             raise ConnectionError(f"{self.provider_name} embedding request failed: {e}")
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -497,25 +546,7 @@ class OpenAICompatibleEmbedding(EmbeddingModel):
             with httpx.Client(timeout=_EMBEDDING_TIMEOUT, limits=_POOL_LIMITS) as client:
                 for i in range(0, len(texts), self.BATCH_SIZE):
                     batch = texts[i:i + self.BATCH_SIZE]
-                    start = time.time()
-                    try:
-                        resp = client.post(
-                            f"{self.base_url}/embeddings",
-                            headers=self._headers(),
-                            json={"model": self.model, "input": batch},
-                        )
-                        resp.raise_for_status()
-                    except Exception as e:
-                        self._record(0, int((time.time() - start) * 1000), "embedding",
-                                     status="error", error=str(e))
-                        raise
-                    data = resp.json()
-                    prompt_tokens, _, _ = _parse_openai_usage(data)
-                    estimated = prompt_tokens == 0
-                    if estimated:
-                        prompt_tokens = sum(estimate_tokens(t) for t in batch)
-                    self._record(prompt_tokens, int((time.time() - start) * 1000), "embedding",
-                                 estimated=estimated)
+                    data = self._request_embeddings(client, batch, "embedding")
                     items = sorted(data["data"], key=lambda x: x["index"])
                     results.extend([it["embedding"] for it in items])
             return results
@@ -571,27 +602,36 @@ class GeminiEmbedding(EmbeddingModel):
     def embed(self, text: str, caller: str = "embedding") -> List[float]:
         if not self.api_key:
             raise ValueError(f"{self.provider_name}: API key not configured")
+        last_error: Optional[Exception] = None
         start = time.time()
-        try:
-            with httpx.Client(timeout=_EMBEDDING_TIMEOUT, limits=_POOL_LIMITS) as client:
-                resp = client.post(
-                    f"{self.base_url}/{self.model}:embedContent",
-                    headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
-                    json={"model": self.model, "content": {"parts": [{"text": text}]}},
-                )
-                resp.raise_for_status()
-                # Gemini embedContent doesn't return usage; estimate by character count with estimated flag
-                record_usage(caller=caller, kind="embedding", model=self.model,
-                             provider=self.provider_id, provider_name=self.provider_name,
-                             prompt_tokens=estimate_tokens(text), estimated=True,
-                             duration_ms=int((time.time() - start) * 1000))
-                return resp.json()["embedding"]["values"]
-        except Exception as e:
-            record_usage(caller=caller, kind="embedding", model=self.model,
-                         provider=self.provider_id, provider_name=self.provider_name,
-                         duration_ms=int((time.time() - start) * 1000),
-                         status="error", error=str(e))
-            raise ConnectionError(f"{self.provider_name} embedding request failed: {e}")
+        for attempt in range(_EMBEDDING_MAX_RETRIES):
+            try:
+                with httpx.Client(timeout=_EMBEDDING_TIMEOUT, limits=_POOL_LIMITS) as client:
+                    resp = client.post(
+                        f"{self.base_url}/{self.model}:embedContent",
+                        headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
+                        json={"model": self.model, "content": {"parts": [{"text": text}]}},
+                    )
+                    resp.raise_for_status()
+                    # Gemini embedContent doesn't return usage; estimate by character count with estimated flag
+                    record_usage(caller=caller, kind="embedding", model=self.model,
+                                 provider=self.provider_id, provider_name=self.provider_name,
+                                 prompt_tokens=estimate_tokens(text), estimated=True,
+                                 duration_ms=int((time.time() - start) * 1000))
+                    return resp.json()["embedding"]["values"]
+            except Exception as e:
+                last_error = e
+                wait = _embedding_retry_wait(e, attempt) if attempt < _EMBEDDING_MAX_RETRIES - 1 else None
+                if wait is None:
+                    break
+                print(f"[providers] {self.provider_name} embedding failed, retrying in {wait:.1f}s "
+                      f"({attempt + 1}/{_EMBEDDING_MAX_RETRIES}): {e}")
+                time.sleep(wait)
+        record_usage(caller=caller, kind="embedding", model=self.model,
+                     provider=self.provider_id, provider_name=self.provider_name,
+                     duration_ms=int((time.time() - start) * 1000),
+                     status="error", error=str(last_error))
+        raise ConnectionError(f"{self.provider_name} embedding request failed: {last_error}")
 
     def is_available(self) -> bool:
         return bool(self.api_key)

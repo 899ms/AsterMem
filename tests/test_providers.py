@@ -10,6 +10,7 @@ verify request assembly; registry logic is validated purely in-memory.
 
 import os
 
+import httpx
 import pytest
 
 from memory import providers
@@ -216,6 +217,92 @@ def test_gemini_embedding_requires_key():
     emb = GeminiEmbedding("https://x/v1beta", "models/m", "")
     with pytest.raises(ValueError):
         emb.embed("hi")
+
+
+class _FailingClient(_FakeClient):
+    """Rejects the first N calls the way httpx does, then behaves like _FakeClient."""
+
+    calls = 0
+    failures = 0
+    status = 429
+    headers: dict = {}
+
+    @classmethod
+    def reset(cls, failures, status=429, headers=None):
+        cls.calls = 0
+        cls.failures = failures
+        cls.status = status
+        cls.headers = headers or {}
+
+    def post(self, url, headers=None, json=None):
+        _FailingClient.calls += 1
+        if _FailingClient.calls <= _FailingClient.failures:
+            request = httpx.Request("POST", url)
+            response = httpx.Response(_FailingClient.status, headers=_FailingClient.headers,
+                                      request=request)
+            raise httpx.HTTPStatusError("upstream refused", request=request, response=response)
+        return super().post(url, headers=headers, json=json)
+
+
+@pytest.fixture()
+def failing_http(monkeypatch):
+    """Fake transport plus captured sleeps, so backoff is asserted without real waiting."""
+    waits: list[float] = []
+    monkeypatch.setattr(providers.httpx, "Client", _FailingClient)
+    monkeypatch.setattr(providers.time, "sleep", waits.append)
+    return _FailingClient, waits
+
+
+def test_embedding_retries_through_rate_limit(failing_http):
+    client, waits = failing_http
+    client.reset(failures=2)
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    assert emb.embed("hello") == [0.1, 0.2, 0.3]
+    assert client.calls == 3
+    assert len(waits) == 2
+
+
+def test_embedding_honors_retry_after_hint(failing_http):
+    client, waits = failing_http
+    client.reset(failures=1, headers={"Retry-After": "7"})
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    emb.embed("hello")
+    assert waits == [7.0]
+
+
+def test_embedding_gives_up_after_max_retries(failing_http):
+    client, waits = failing_http
+    client.reset(failures=99)
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    with pytest.raises(ConnectionError):
+        emb.embed("hello")
+    assert client.calls == 3
+
+
+def test_embedding_does_not_retry_rejected_key(failing_http):
+    client, waits = failing_http
+    client.reset(failures=99, status=401)
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    with pytest.raises(ConnectionError):
+        emb.embed("hello")
+    assert client.calls == 1
+    assert waits == []
+
+
+def test_embedding_batch_retries_per_batch(failing_http):
+    client, waits = failing_http
+    client.reset(failures=1)
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    assert len(emb.embed_batch([f"t{i}" for i in range(25)])) == 25
+    assert client.calls == 3  # first batch rejected once, then both batches succeed
+
+
+def test_gemini_embedding_retries_through_rate_limit(failing_http):
+    client, waits = failing_http
+    client.reset(failures=1)
+    emb = GeminiEmbedding("https://generativelanguage.googleapis.com/v1beta", "models/m", "gk-1")
+    assert len(emb.embed("hi")) == 8
+    assert client.calls == 2
 
 
 def test_chat_generate_tags_parses_result(fake_http):

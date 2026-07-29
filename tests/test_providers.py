@@ -73,6 +73,39 @@ def test_default_asterove_provider_present():
     assert entry["api_type"] == "openai_compatible"
     assert entry["base_url"] == "https://asterove.com/api/v1"
     assert entry["api_key_env"] == "ASTEROVE_API_KEY"
+    # The chat alias is refused on /embeddings, so reusing it here left semantic search dead for
+    # everyone who added this provider.
+    assert entry["embedding_model"] != entry["chat_model"]
+    assert entry["embedding_model"] == "dashscope/text-embedding-v4"
+
+
+def test_broken_asterove_embedding_model_is_repaired_on_upgrade():
+    """
+    asterove/standard shipped as the embedding model but is a chat alias the gateway rejects, so it
+    never produced a vector. Rewriting it therefore discards nothing an upgrading user still needs.
+    """
+    config = {
+        "providers": {"asterove": dict(PROVIDER_CATALOG["asterove"],
+                                       embedding_model="asterove/standard")},
+        "active": {"embedding_provider": "asterove", "chat_provider": "asterove"},
+        "provider_catalog_version": 3,
+    }
+
+    assert normalize_config(config) is True
+    assert config["providers"]["asterove"]["embedding_model"] == "dashscope/text-embedding-v4"
+    assert normalize_config(config) is False
+
+
+def test_self_chosen_asterove_embedding_model_survives_the_repair():
+    config = {
+        "providers": {"asterove": dict(PROVIDER_CATALOG["asterove"],
+                                       embedding_model="my/own-embedding")},
+        "active": {"embedding_provider": "asterove", "chat_provider": "asterove"},
+        "provider_catalog_version": 3,
+    }
+    normalize_config(config)
+
+    assert config["providers"]["asterove"]["embedding_model"] == "my/own-embedding"
 
 
 def test_catalog_includes_anthropic_and_grok():

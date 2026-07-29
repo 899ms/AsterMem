@@ -307,7 +307,9 @@ PROVIDER_CATALOG: dict = {
         "api_type": "openai_compatible",
         "base_url": "https://asterove.com/api/v1",
         "api_key_env": "ASTEROVE_API_KEY",
-        "embedding_model": "asterove/standard",
+        # asterove/standard is a chat alias; the gateway rejects it on /embeddings with
+        # "Unsupported model for OpenAI compatibility mode", so it never yielded a vector.
+        "embedding_model": "dashscope/text-embedding-v4",
         "chat_model": "asterove/standard",
     },
 }
@@ -319,7 +321,7 @@ DEFAULT_PROVIDERS = {provider_id: dict(PROVIDER_CATALOG[provider_id]) for provid
 
 #: Schema revision of the provider registry. Stamped onto a newly seeded config so the migrations
 #: below, which exist to correct older layouts, do not run against defaults built from this catalog.
-PROVIDER_CATALOG_VERSION = 3
+PROVIDER_CATALOG_VERSION = 4
 
 
 def normalize_config(config: dict) -> bool:
@@ -431,6 +433,17 @@ def normalize_config(config: dict) -> bool:
             if not entry.get("name") or entry.get("name") in legacy_names.get(provider_id, set()):
                 entry["name"] = catalog_entry["name"]
         config["provider_catalog_version"] = 3
+        changed = True
+
+    # v4 repairs the Asterove embedding model. It shipped as asterove/standard, a chat alias the
+    # gateway refuses on /embeddings, so semantic search was dead for everyone who added this
+    # provider. Rewriting it cannot discard useful vectors because that model never returned any;
+    # a value the user has since changed themselves is left alone.
+    if config.get("provider_catalog_version", 1) < 4:
+        entry = providers.get("asterove")
+        if entry and entry.get("embedding_model") == "asterove/standard":
+            entry["embedding_model"] = PROVIDER_CATALOG["asterove"]["embedding_model"]
+        config["provider_catalog_version"] = 4
         changed = True
 
     # An id that is no longer in the registry cannot be built, and the settings page resends whatever

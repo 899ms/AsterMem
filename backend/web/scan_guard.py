@@ -21,7 +21,7 @@ import ipaddress
 import os
 import re
 import time
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from urllib.parse import unquote
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -133,6 +133,11 @@ class ScanGuard:
         self._clock = clock
         # address -> [strike count, blocked-until timestamp]
         self._offenders = OrderedDict()
+        # Counted for the security page only. Refusals during a block are deliberately not logged,
+        # so without a tally the owner sees three log lines for a forty-request sweep and cannot
+        # tell whether the guard is working.
+        self._rule_hits = Counter()
+        self._refused_total = 0
 
     def client_address(self, peer: str, headers) -> str:
         """
@@ -220,12 +225,57 @@ class ScanGuard:
         """
         address = self.client_address(peer, headers)
         if self.is_blocked(address):
+            self._refused_total += 1
+            self._rule_hits["active_block"] += 1
             return True, address, "active_block"
         rule = match_malicious_path(path)
         if not rule:
             return False, address, ""
         self.record_strike(address)
+        self._refused_total += 1
+        self._rule_hits[rule] += 1
         return True, address, rule
+
+    def snapshot(self) -> dict:
+        """
+        Read-only view for the security page.
+
+        Reports blocked and merely-suspected addresses separately: an address one strike short of
+        the threshold is still being served normally, and presenting it as blocked would send the
+        owner chasing a block that does not exist.
+
+        Counts are per process. Blocks live in memory by design (see the class docstring), so there
+        is no history to report and the page has to say as much rather than imply a lifetime total.
+        """
+        now = self._clock()
+        blocked = []
+        watching = []
+        for address, (strikes, blocked_until) in self._offenders.items():
+            remaining = int(blocked_until - now)
+            if remaining > 0:
+                blocked.append({
+                    "address": address,
+                    "strikes": strikes,
+                    "blocked_for_seconds": remaining,
+                })
+            else:
+                watching.append({"address": address, "strikes": strikes})
+        blocked.sort(key=lambda item: item["blocked_for_seconds"], reverse=True)
+        watching.sort(key=lambda item: item["strikes"], reverse=True)
+        return {
+            "blocked": blocked,
+            "watching": watching,
+            "tracked_addresses": len(self._offenders),
+            "refused_total": self._refused_total,
+            # "active_block" is kept in here on purpose: the gap between it and the named rules is
+            # what the guard actually saves, since those requests never reach a handler or a log.
+            "rule_hits": dict(sorted(self._rule_hits.items(), key=lambda kv: kv[1], reverse=True)),
+            "block_after_strikes": self._block_after_strikes,
+            "block_ladder_seconds": list(BLOCK_LADDER_SECONDS),
+            "max_tracked_addresses": MAX_TRACKED_ADDRESSES,
+            "trusted_proxies": [str(network) for network in self._trusted],
+            "owner_addresses": sorted(self._owners),
+        }
 
 
 class ScanGuardMiddleware(BaseHTTPMiddleware):

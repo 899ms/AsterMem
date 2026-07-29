@@ -275,6 +275,7 @@ def create_app(config: dict, config_path: str, services: dict):
     from web.api_explore import init_explore_api, router as explore_router
     from web.api_profile import init_profile_api, router as profile_router
     from web.api_usage import init_usage_api, router as usage_router
+    from web.api_security import init_security_api, router as security_router
     from web.scan_guard import ScanGuard, ScanGuardMiddleware
 
     init_api(services["sync_manager"], services["search_engine"], config, config_path,
@@ -304,6 +305,9 @@ def create_app(config: dict, config_path: str, services: dict):
     # reachable only on a LAN exempts its whole address range anyway, so it costs nothing there.
     scan_guard = ScanGuard()
     scan_guard_enabled = os.environ.get("ASTERMEM_SCAN_GUARD", "1").strip().lower() not in ("0", "false", "no")
+    # The security page reads this same instance: its counters only exist in the object the
+    # middleware is holding.
+    init_security_api(scan_guard, scan_guard_enabled)
 
     class APILogMiddleware(BaseHTTPMiddleware):
         """API call logging: provides data for /logs page, excludes streaming and self-referencing paths"""
@@ -403,6 +407,7 @@ def create_app(config: dict, config_path: str, services: dict):
     app.include_router(explore_router)
     app.include_router(profile_router)
     app.include_router(usage_router)
+    app.include_router(security_router)
 
     # User-uploaded images (data/images) are mounted separately to avoid SPA fallback
     images_dir = os.path.join(_abs(config.get("storage", {}).get("data_dir", "./data")), "images")

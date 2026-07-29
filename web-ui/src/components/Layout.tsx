@@ -39,6 +39,7 @@ const NAV_ITEMS: NavEntry[] = [
   { to: "/import", label: "Import / Export" },
   { to: "/settings", label: "Settings" },
   { to: "/admin", label: "Admin" },
+  { to: "/security", label: "Security" },
 ];
 
 if (import.meta.env.DEV) {

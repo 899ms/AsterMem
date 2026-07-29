@@ -42,14 +42,14 @@ from web.scan_guard import (  # noqa: E402
 REAL_PATHS = [
     "/", "/login", "/methodology", "/home", "/memories", "/new", "/edit/mem_123",
     "/view/mem_123", "/tags", "/import", "/explore", "/graph", "/profile", "/logs",
-    "/usage", "/settings", "/admin", "/playground",
+    "/usage", "/settings", "/admin", "/security", "/playground",
     "/assets/index-DzcI2Rqh.js", "/assets/index-ABC123.css",
     "/static/images/upload_1.png", "/favicon.ico", "/favicon.png",
     "/astermem-icon.png", "/apple-touch-icon.png", "/icons/icon-192.png",
     "/api/config", "/api/memories", "/api/memories/mem_123", "/api/search",
     "/api/agent/call", "/api/explore/stream", "/api/profile", "/api/usage",
     "/api/logs", "/api/export", "/api/import", "/api/vector-rebuild",
-    "/api/skill/raw", "/api/methodology", "/api/auth/login",
+    "/api/skill/raw", "/api/methodology", "/api/auth/login", "/api/security",
 ]
 
 KNOWN_PROBES = [

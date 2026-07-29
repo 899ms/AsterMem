@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Request, Respons
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
+from memory import output_language
 from memory.database import Database
 from memory.demo_mode import is_demo_mode
 from memory.storage import MemoryStorage
@@ -83,6 +84,7 @@ class ConfigUpdate(BaseModel):
     semantic_enabled: Optional[bool] = None
     min_similarity: Optional[float] = None
     api_log_max: Optional[int] = None
+    output_language: Optional[str] = None     # UI locale code, or "auto" to follow each memory
 
 
 class LoginRequest(BaseModel):
@@ -253,6 +255,7 @@ def _config_view() -> dict:
                 "min_similarity_max": MAX_NOISE_FLOOR,
             }
         },
+        "output_language": output_language.current(),
         "server": {
             "port": _config.get("server", {}).get("port", _config.get("server", {}).get("mcp_port", 8765)),
             "api_log_max": _config.get("server", {}).get("api_log_max", 1000),
@@ -378,6 +381,10 @@ def _apply_config_update(data: ConfigUpdate) -> dict:
         api_logger = get_api_logger()
         if api_logger:
             api_logger.MAX_RECORDS = data.api_log_max
+    if data.output_language is not None:
+        # Normalized on the way in so an unsupported locale degrades to "auto" instead of being
+        # written to config.yaml and reaching prompts as a language nobody asked for.
+        _config["output_language"] = output_language.normalize(data.output_language)
 
     _save_config()
     return {"success": True, "requires_vector_rebuild": embedding_changed}

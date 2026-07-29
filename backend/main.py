@@ -41,6 +41,7 @@ from memory.demo_mode import DemoReadOnlyMiddleware, is_demo_mode, seed_demo_lib
 from memory.demo_profile import maybe_seed_demo_profile
 from memory.profile import ProfileService, ProfileScheduler
 from memory.profile_dream import DreamManager
+from memory import output_language
 from memory.providers import get_embedding_model, normalize_config
 from memory.recall import DEFAULT_NOISE_FLOOR, migrate_recall_config
 from memory.search import SearchEngine
@@ -55,6 +56,10 @@ CONFIG_PATH = os.path.abspath(os.environ.get("ASTERMEM_CONFIG") or os.path.join(
 
 DEFAULT_CONFIG = {
     "auth": {"default_password": "", "salt": "astermem_salt_change_me", "login_required": True},
+    # Language for model-generated text (summaries, tags, suggestions). The Web UI writes its own
+    # locale here when the user switches language; "auto" leaves output to follow each memory's
+    # own language, which is how the project behaved before the field existed.
+    "output_language": "auto",
     # min_similarity is the noise floor for semantic recall, not a relevance threshold:
     # relevance is determined relatively by recall.adaptive_cutoff using the best hit as anchor (see memory/recall.py)
     "search": {"keyword": {"enabled": True}, "semantic": {"enabled": True, "min_similarity": DEFAULT_NOISE_FLOOR}},
@@ -143,6 +148,11 @@ def build_services(config: dict):
     Design intent: Assemble in a single factory; tests can pass isolated config to get isolated instances.
     Key constraint: When embedding provider is unavailable, semantic search must degrade gracefully, never throw to startup layer.
     """
+    # Prompt sites read the output language straight off this dict, so it has to be bound before
+    # any of them can run — and because it is bound by reference, a language saved from the
+    # settings page reaches long-lived chunkers and extractors with no further wiring.
+    output_language.bind(config)
+
     storage_cfg = config.get("storage", {})
     data_dir = _abs(storage_cfg.get("data_dir", "./data"))
     os.makedirs(data_dir, exist_ok=True)

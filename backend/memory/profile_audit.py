@@ -24,6 +24,8 @@ import re
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from . import output_language
+
 
 def _now() -> str:
     return datetime.now().isoformat()
@@ -252,6 +254,7 @@ class ProfileAuditor:
             + "\n\n".join(blocks)
             + '\n\nOutput only JSON (reason max 20 words): '
               '{"verdicts": [{"index": 0, "supported": true, "reason": "..."}, ...]}'
+            + output_language.current_directive(json_mode=True)
         )
         try:
             raw = chat.chat([{"role": "user", "content": prompt}], temperature=0)
@@ -349,6 +352,7 @@ class ProfileAuditor:
                 + "\n\n".join(blocks)
                 + '\n\nOutput only JSON (reason max 20 words): '
                   '{"verdicts": [{"index": 0, "supported": true, "reason": "..."}, ...]}'
+                + output_language.current_directive(json_mode=True)
             )
             try:
                 raw = chat.chat([{"role": "user", "content": prompt}], temperature=0)

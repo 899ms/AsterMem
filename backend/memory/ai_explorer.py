@@ -14,6 +14,7 @@ import asyncio
 import httpx
 from typing import List, Dict, Any, AsyncGenerator, Optional
 
+from . import output_language
 from .search import SearchEngine
 from .usage_tracker import estimate_tokens, record_usage
 
@@ -281,6 +282,7 @@ Please generate 2-3 directions to help organize my thinking. Requirements:
 3. Each suggestion no more than 25 words
 
 Output suggestions only, one per line, no numbering or explanation.
+{output_language.current_directive()}
 """
         start = time.time()
         try:
@@ -686,6 +688,8 @@ Task:
    - hl is 2-4 keywords/phrases you think should be highlighted in the snippet
 3. Each transition should be no more than 2 sentences
 4. Do not rewrite the original text
+5. Copy every hl keyword verbatim from the snippet it belongs to — the reader's highlighting is a
+   literal match against the snippet, so a translated or reworded keyword highlights nothing
 
 Snippets:
 {trunk_text}
@@ -698,6 +702,7 @@ Regarding this topic, I found some records:
 There's also a related record:
 
 <trunk id="2" hl="budget adjustment,financial approval"/>
+{output_language.current_directive()}
 
 Begin:"""
 
@@ -716,7 +721,10 @@ Begin:"""
 Related snippets:
 {trunk_list}
 
-Write short transition narration, use XML tags <trunk id="N" hl="keyword1,keyword2"/> to display original text (hl is keywords to highlight). Begin:"""
+Write short transition narration, use XML tags <trunk id="N" hl="keyword1,keyword2"/> to display original text (hl is keywords to highlight, copied verbatim from the snippet).
+{output_language.current_directive()}
+
+Begin:"""
 
     async def generate_memory(
         self, 
@@ -763,6 +771,7 @@ Output in XML format, with note content inside <content> tags:
 - [ ] Task 1
 - [ ] Task 2
 </content>
+{output_language.current_directive()}
 
 Please begin organizing:"""
 

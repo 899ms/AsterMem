@@ -12,6 +12,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { ToastHost } from "./toast";
 import { api } from "./api";
 import { publishAuthSnapshot } from "./authState";
+import { useOutputLanguageSync } from "./outputLanguage";
 import { LoadingLine } from "./components/EmptyState";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -41,9 +42,14 @@ import { PlaygroundPage } from "./pages/PlaygroundPage";
  * freezing on loading when offline.
  */
 function AuthGate({ children }: { children: ReactNode }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const location = useLocation();
   const [state, setState] = useState<"checking" | "ok" | "anonymous">("checking");
+
+  // The reader's language has to reach the backend for AI-generated text to come back in it.
+  // Hanging it off the session probe covers both switching language and never touching the
+  // picker, and keeps the write out of anonymous pages where it could only 401.
+  useOutputLanguageSync(locale, state === "ok");
 
   useEffect(() => {
     let cancelled = false;

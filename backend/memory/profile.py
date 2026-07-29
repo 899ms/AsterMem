@@ -31,6 +31,7 @@ from typing import Callable, List, Optional
 
 import yaml
 
+from . import output_language
 from .profile_audit import ProfileAuditor, parse_json_block
 
 # L1 required + L2 optional field schema. key is stable identifier, label is for UI display.
@@ -284,6 +285,7 @@ class ProfileService:
             f"Currently filled: {json.dumps(current, ensure_ascii=False)}\n\n"
             "User's memory text:\n" + "\n\n".join(blocks) + "\n\n"
             'Output only JSON: {"suggestions": {"nickname": "...", "occupation": "..."}}'
+            + output_language.current_directive(json_mode=True)
         )
         raw = chat.chat([{"role": "user", "content": prompt}], temperature=0.2)
         data = parse_json_block(raw) or {}
@@ -428,6 +430,7 @@ class ProfileService:
             f"Existing claims:\n{existing_text}\n\n"
             "Today's changed memory text:\n" + "\n\n".join(source_blocks) + "\n\n"
             'Output only JSON: {"claims": [{"text": "...", "sources": ["mem_xxx"], "replaces": [12]}]}'
+            + output_language.current_directive(json_mode=True)
         )
         try:
             raw = chat.chat([{"role": "user", "content": prompt}], temperature=0.2)

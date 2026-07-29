@@ -31,6 +31,7 @@ from typing import List, Optional, Union
 
 import httpx
 
+from . import output_language
 from .usage_tracker import estimate_tokens, record_usage
 
 # Network config uses proven values: short connect timeout to quickly detect dead connections,
@@ -1133,6 +1134,7 @@ def _generate_tags_via_chat(chat_model, title: str, content: str, existing_tags:
 3. Separate each level with /
 4. ⭐ Highest priority: reuse tags from similar articles; then select from existing hierarchy; create new tags only when none fit
 5. Only output tags, separated by commas, no other content
+{output_language.current_directive()}
 
 [Tags]"""
 

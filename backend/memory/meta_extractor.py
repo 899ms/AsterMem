@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from abc import ABC, abstractmethod
 
+from . import output_language
 from .usage_tracker import estimate_tokens, record_usage
 
 
@@ -172,6 +173,7 @@ class TextMetaExtractor(BaseMetaExtractor):
 3. Try to identify person roles (client/colleague/manager/decision-maker, etc.)
 4. Time inference should be calculated based on the [Current Date]
 5. Output JSON directly, no other explanations or Markdown formatting
+{output_language.current_directive(json_mode=True)}
 
 [Output JSON]"""
 
@@ -535,11 +537,12 @@ HD, photography, wide-angle lens, natural light, outdoor, blue sky, overcast, gr
                 }
             }
         
+        image_prompt = self.IMAGE_PROMPT + output_language.current_directive()
         messages = [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": self.IMAGE_PROMPT},
+                    {"type": "text", "text": image_prompt},
                     image_content
                 ]
             }
@@ -561,7 +564,7 @@ HD, photography, wide-angle lens, natural light, outdoor, blue sky, overcast, gr
             data = response.json()
             result_text = data["choices"][0]["message"]["content"]
             _report_meta_usage(self, data, int((time.time() - start) * 1000),
-                               prompt_text=self.IMAGE_PROMPT, output_text=result_text)
+                               prompt_text=image_prompt, output_text=result_text)
 
             return self._parse_response(result_text)
             
@@ -669,7 +672,7 @@ HD, photography, wide-angle lens, natural light, outdoor, blue sky, overcast, gr
 3. Details: Colors, textures, expressions, actions, and other specifics
 4. Atmosphere: The overall mood or atmosphere conveyed
 
-Please describe in fluent paragraph form, not list format. The description should be as detailed yet concise as possible, around 200-400 words."""
+Please describe in fluent paragraph form, not list format. The description should be as detailed yet concise as possible, around 200-400 words.""" + output_language.current_directive()
 
         messages = [
             {
@@ -928,6 +931,7 @@ If similar content tags are not applicable, please select from the tag hierarchy
 3. Prioritize using tags from similar content or the system's existing tags
 4. Separate with commas
 5. [Important] Output tags directly, do not output any reasoning or explanations
+{output_language.current_directive()}
 
 [Output Example]
 lifestyle/shopping, daily/grocery, spending-record"""
@@ -1044,7 +1048,8 @@ Please output in the following JSON format (output JSON directly, no other conte
 Notes:
 1. Only fill in information that can be determined from the image
 2. Use empty arrays or empty strings for undetermined fields
-3. Output JSON directly, no explanations"""
+3. Output JSON directly, no explanations
+{output_language.current_directive(json_mode=True)}"""
 
         messages = [
             {"role": "system", "content": "You are a metadata extraction assistant. Only output results in JSON format, without any explanations or reasoning."},

@@ -12,6 +12,7 @@ import re
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
+from . import output_language
 from .models import Trunk, generate_trunk_id
 # After refactoring, Chat models are unified as protocol adapters in providers.py,
 # providing .chat() / .generate_raw() / .generate_tags() via duck typing; used here only for type hints.
@@ -416,6 +417,7 @@ Grouping result:"""
         prompt = f"""Summarize the core point of the following content in one sentence (50 words or fewer, output the summary directly with no other explanation):
 
 {content_preview}
+{output_language.current_directive()}
 
 Summary:"""
 

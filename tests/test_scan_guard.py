@@ -251,3 +251,36 @@ def test_middleware_lets_real_requests_through(guarded_client):
         response = guarded_client.get(path)
         assert response.status_code == 200, path
         assert response.json() == {"reached": True}
+
+
+# ---------- The fallback the rules above are compensating for ----------
+#
+# The rules can only name probes that someone has already seen. What made a miss worth exploiting is
+# the SPA fallback answering every unknown path with the app shell, so a probe the rules do not cover
+# came back 200 and read as found. The paths below are deliberately ones no rule matches: they are
+# the gap, and they must not depend on the rule list to be closed.
+
+def _spa_is_built(anon_client) -> bool:
+    """create_app only registers the fallback when web-ui/dist exists."""
+    return anon_client.get("/home").headers.get("content-type", "").startswith("text/html")
+
+
+@pytest.mark.parametrize("path", ["/secrets.json", "/.pypirc", "/mcp.json", "/dump.log"])
+def test_a_file_that_is_not_here_is_reported_missing(anon_client, path):
+    if not _spa_is_built(anon_client):
+        pytest.skip("web-ui build not present")
+    assert match_malicious_path(path) == "", f"{path} should be testing the fallback, not a rule"
+    response = anon_client.get(path)
+    assert response.status_code == 404
+    assert "<div id=" not in response.text
+
+
+@pytest.mark.parametrize("path", ["/", "/home", "/settings", "/view/mem_123", "/edit/mem_123"])
+def test_client_side_routes_still_receive_the_app(anon_client, path):
+    """React Router needs the shell for paths the server has no file for; only those without an
+    extension, which is every route the app declares."""
+    if not _spa_is_built(anon_client):
+        pytest.skip("web-ui build not present")
+    response = anon_client.get(path)
+    assert response.status_code == 200, path
+    assert response.headers["content-type"].startswith("text/html")

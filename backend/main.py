@@ -427,6 +427,13 @@ def create_app(config: dict, config_path: str, services: dict):
             # Prevent directory traversal: only allow real files within dist, everything else falls back to index.html
             if candidate.startswith(dist_dir) and os.path.isfile(candidate):
                 return FileResponse(candidate)
+            # A request for a file that is not here is answered as missing rather than with the app
+            # shell. Handing 200 and a full page to /secrets.json tells a scanner the path exists and
+            # is worth pursuing, and ScanGuard's rules can only name probes already known, so the
+            # gap reopens with every fashion in scanning. React Router's own paths never carry a file
+            # extension, which is what separates the two cases.
+            if "." in full_path.rsplit("/", 1)[-1]:
+                return Response(status_code=404)
             return FileResponse(os.path.join(dist_dir, "index.html"))
     else:
         @app.get("/")

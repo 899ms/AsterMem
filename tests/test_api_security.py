@@ -20,6 +20,9 @@ AGPL-3.0 License
 import os
 import sys
 
+import pytest
+from fastapi import HTTPException
+
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT_DIR, "backend"))
 
@@ -167,6 +170,113 @@ def test_offenders_are_reported_independently():
     assert [row["address"] for row in snapshot["blocked"]] == [SCANNER]
     assert [row["address"] for row in snapshot["watching"]] == [OTHER_SCANNER]
     assert snapshot["tracked_addresses"] == 2
+
+
+def test_releasing_lifts_the_block_and_clears_the_strikes():
+    """
+    A released address gets a clean slate rather than sliding back into the watch list one strike
+    short of the threshold, which would re-block it on its next request.
+    """
+    guard = _guard()
+    for _ in range(3):
+        _probe(guard, SCANNER)
+    assert guard.is_blocked(SCANNER) is True
+
+    assert guard.release(SCANNER) is True
+    assert guard.is_blocked(SCANNER) is False
+    snapshot = guard.snapshot()
+    assert snapshot["blocked"] == []
+    assert snapshot["watching"] == []
+
+
+def test_a_released_address_is_judged_from_scratch():
+    """Releasing is not an exemption: a scanner that carries on earns the full ladder again."""
+    guard = _guard()
+    for _ in range(3):
+        _probe(guard, SCANNER)
+    guard.release(SCANNER)
+
+    for _ in range(2):
+        _probe(guard, SCANNER)
+    assert guard.is_blocked(SCANNER) is False
+
+    _probe(guard, SCANNER)
+    assert guard.is_blocked(SCANNER) is True
+
+
+def test_releasing_leaves_other_offenders_alone():
+    guard = _guard()
+    for _ in range(3):
+        _probe(guard, SCANNER)
+    for _ in range(3):
+        _probe(guard, OTHER_SCANNER)
+
+    guard.release(SCANNER)
+    assert guard.is_blocked(SCANNER) is False
+    assert guard.is_blocked(OTHER_SCANNER) is True
+
+
+def test_releasing_an_untracked_address_is_not_an_error():
+    guard = _guard()
+    assert guard.release(SCANNER) is False
+
+
+def test_release_endpoint_is_owner_only(anon_client):
+    resp = anon_client.post("/api/security/release", json={"address": SCANNER})
+    assert resp.status_code == 401, resp.text
+
+
+def test_release_endpoint_reports_whether_anything_was_lifted(client):
+    """Idempotent: a block that lapsed before the click is already in the state the caller wanted."""
+    resp = client.post("/api/security/release", json={"address": SCANNER})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["released"] is False
+
+
+def test_release_endpoint_rejects_things_that_are_not_addresses(client):
+    for value in ("", "not-an-ip", "example.com", "10.0.0.1/8"):
+        resp = client.post("/api/security/release", json={"address": value})
+        assert resp.status_code == 400, f"{value!r} -> {resp.status_code}"
+
+
+def test_release_endpoint_normalises_the_address(client, app_bundle):
+    """
+    The tracker keys on the normalised form, so a differently spelled address has to resolve to the
+    same entry — otherwise the button silently does nothing for IPv6.
+    """
+    from web import api_security
+
+    guard = api_security._guard
+    assert guard is not None
+    # A routable address on purpose: the IPv6 documentation range is private, so it would be exempt
+    # and the test would pass without the guard ever blocking anything.
+    for _ in range(3):
+        guard.evaluate("/.env", "2606:4700:4700:0000:0000:0000:0000:1111", {})
+    assert guard.is_blocked("2606:4700:4700::1111") is True
+
+    resp = client.post("/api/security/release", json={"address": "2606:4700:4700::1111"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["released"] is True
+    assert guard.is_blocked("2606:4700:4700::1111") is False
+
+
+def test_release_is_refused_when_the_guard_is_off():
+    import asyncio
+
+    from web import api_security
+
+    original_guard, original_enabled = api_security._guard, api_security._enabled
+    try:
+        api_security.init_security_api(None, False)
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(api_security.release_address(
+                api_security.ReleaseRequest(address=SCANNER), admin_id=1,
+            ))
+        assert excinfo.value.status_code == 400
+    finally:
+        api_security.init_security_api(original_guard, original_enabled)
 
 
 def test_disabled_guard_reports_off_rather_than_zeroes():

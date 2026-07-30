@@ -211,6 +211,18 @@ class ScanGuard:
             self._offenders.popitem(last=False)
         return strikes
 
+    def release(self, address: str) -> bool:
+        """
+        Drop an address from the tracker, ending its block and resetting its strike count.
+
+        For the case the ladder cannot tell apart: a client that belongs here tripped a rule and is
+        now locked out, and the only other way back is restarting the service.
+
+        Releasing is not an exemption. The address is judged from scratch, so one that goes on
+        probing earns the block again; ASTERMEM_ALLOWED_IPS is the way to say "never block this".
+        """
+        return self._offenders.pop(address, None) is not None
+
     def evaluate(self, path: str, peer: str, headers) -> tuple:
         """
         Decide whether to answer a request.

@@ -730,6 +730,10 @@ const dict: Record<string, string> = {
   "Loopback and private ranges only": "ループバックと私設アドレスのみ",
   "Loopback, private ranges and the reverse proxy are never blocked, so an instance cannot lock its owner out.": "ループバック・私設アドレス・リバースプロキシは決してブロックしません。持ち主自身を締め出さないためです。",
   "Unable to load the protection status": "保護状態を読み込めません",
+  "Lift block": "ブロック解除",
+  "{address} can reach this instance again": "{address} は再びこのインスタンスにアクセスできます",
+  "Unable to lift the block": "ブロックを解除できません",
+  "Lifting a block is not an exemption: the address starts over and is blocked again if it keeps probing. Use ASTERMEM_ALLOWED_IPS for one that should never be blocked.": "ブロック解除は許可登録ではありません。カウントはゼロに戻り、探索を続ければ再びブロックされます。常に許可したいアドレスには ASTERMEM_ALLOWED_IPS を使ってください。",
 };
 
 export default dict;

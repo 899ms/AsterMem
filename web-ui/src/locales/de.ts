@@ -730,6 +730,10 @@ const dict: Record<string, string> = {
   "Loopback and private ranges only": "Nur Loopback und private Bereiche",
   "Loopback, private ranges and the reverse proxy are never blocked, so an instance cannot lock its owner out.": "Loopback, private Bereiche und der Reverse Proxy werden nie gesperrt, damit eine Instanz ihren Besitzer nicht aussperrt.",
   "Unable to load the protection status": "Schutzstatus kann nicht geladen werden",
+  "Lift block": "Sperre aufheben",
+  "{address} can reach this instance again": "{address} erreicht diese Instanz wieder",
+  "Unable to lift the block": "Sperre kann nicht aufgehoben werden",
+  "Lifting a block is not an exemption: the address starts over and is blocked again if it keeps probing. Use ASTERMEM_ALLOWED_IPS for one that should never be blocked.": "Eine aufgehobene Sperre ist keine Ausnahme: Die Adresse fängt von vorn an und wird erneut gesperrt, wenn sie weiter sondiert. Für eine Adresse, die nie gesperrt werden soll, nutzen Sie ASTERMEM_ALLOWED_IPS.",
 };
 
 export default dict;

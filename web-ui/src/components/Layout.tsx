@@ -72,7 +72,13 @@ export function Layout({ title, actions, toolbar, fill, children }: {
   const { loginRequired, username, demoMode } = useAuthSnapshot();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const navLinks = useMemo(() => NAV_ITEMS.filter(isLink), []);
+  // The demo refuses /api/security outright — it would report the host's own defences to anyone,
+  // and a demo has no sign-in. Showing an entry that can only error is worse than not showing it.
+  const navEntries = useMemo(
+    () => (demoMode ? NAV_ITEMS.filter((entry) => !isLink(entry) || entry.to !== "/security") : NAV_ITEMS),
+    [demoMode],
+  );
+  const navLinks = useMemo(() => navEntries.filter(isLink), [navEntries]);
 
   const parent = DEEP_LINK_PARENT.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
   const activePath = parent ?? location.pathname;
@@ -127,7 +133,7 @@ export function Layout({ title, actions, toolbar, fill, children }: {
         <nav className="sidebar-nav">
           {(() => {
             let linkIdx = 0;
-            return NAV_ITEMS.map((entry, i) => {
+            return navEntries.map((entry, i) => {
               if (!isLink(entry)) {
                 return <span key={`g-${i}`} className="sidebar-group">{t(entry.group)}</span>;
               }

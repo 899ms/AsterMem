@@ -15,6 +15,7 @@ import { IconRefresh } from "@tabler/icons-react";
 import { Layout } from "../components/Layout";
 import { LoadingLine } from "../components/EmptyState";
 import { api, reportError } from "../api";
+import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
 
 const POLL_MS = 15000;
@@ -52,6 +53,7 @@ export function SecurityPage() {
   const { t } = useI18n();
   const [status, setStatus] = useState<SecurityStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [releasing, setReleasing] = useState<string | null>(null);
 
   const load = useCallback(async (showSpinner = false) => {
     if (showSpinner) setLoading(true);
@@ -69,6 +71,21 @@ export function SecurityPage() {
     const timer = window.setInterval(() => void load(), POLL_MS);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  const release = async (address: string) => {
+    setReleasing(address);
+    try {
+      await api("POST", "/api/security/release", { address });
+      // Releasing clears the strike count, so the row leaves both tables rather than dropping into
+      // the watch list: the point of the button is to give the address a clean slate.
+      emitToast("success", t("{address} can reach this instance again", { address }));
+      await load();
+    } catch (err) {
+      reportError(err, t("Unable to lift the block"));
+    } finally {
+      setReleasing(null);
+    }
+  };
 
   const blocked = status?.blocked ?? [];
   const watching = status?.watching ?? [];
@@ -149,6 +166,7 @@ export function SecurityPage() {
                         <th>{t("Address")}</th>
                         <th>{t("Probes")}</th>
                         <th>{t("Unblocks in")}</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -157,10 +175,27 @@ export function SecurityPage() {
                           <td className="mono-sm">{row.address}</td>
                           <td>{row.strikes}</td>
                           <td>{formatDuration(row.blocked_for_seconds)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn small"
+                              onClick={() => void release(row.address)}
+                              disabled={releasing === row.address}
+                            >
+                              {t("Lift block")}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                )}
+                {blocked.length > 0 && (
+                  <div style={{ padding: 18, borderTop: "1px solid var(--line)" }}>
+                    <span className="mono-sm muted">
+                      {t("Lifting a block is not an exemption: the address starts over and is blocked again if it keeps probing. Use ASTERMEM_ALLOWED_IPS for one that should never be blocked.")}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>

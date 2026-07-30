@@ -730,6 +730,10 @@ const dict: Record<string, string> = {
   "Loopback and private ranges only": "僅本機和內網位址",
   "Loopback, private ranges and the reverse proxy are never blocked, so an instance cannot lock its owner out.": "本機、內網位址和反向代理永不封鎖，以免實例把自己的主人擋在門外。",
   "Unable to load the protection status": "無法載入防護狀態",
+  "Lift block": "解除封鎖",
+  "{address} can reach this instance again": "{address} 已可重新存取本執行個體",
+  "Unable to lift the block": "無法解除封鎖",
+  "Lifting a block is not an exemption: the address starts over and is blocked again if it keeps probing. Use ASTERMEM_ALLOWED_IPS for one that should never be blocked.": "解除封鎖不等於加入白名單：該位址會從零重新計數，繼續探測就會再次被封。若希望某個位址永不封鎖，請使用 ASTERMEM_ALLOWED_IPS。",
 };
 
 export default dict;

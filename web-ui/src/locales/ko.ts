@@ -730,6 +730,10 @@ const dict: Record<string, string> = {
   "Loopback and private ranges only": "루프백과 사설 대역만",
   "Loopback, private ranges and the reverse proxy are never blocked, so an instance cannot lock its owner out.": "루프백, 사설 대역, 리버스 프록시는 절대 차단하지 않아요. 주인이 잠기는 일을 막기 위해서예요.",
   "Unable to load the protection status": "보호 상태를 불러올 수 없어요",
+  "Lift block": "차단 해제",
+  "{address} can reach this instance again": "{address} 이(가) 다시 이 인스턴스에 접근할 수 있어요",
+  "Unable to lift the block": "차단을 해제할 수 없어요",
+  "Lifting a block is not an exemption: the address starts over and is blocked again if it keeps probing. Use ASTERMEM_ALLOWED_IPS for one that should never be blocked.": "차단 해제는 허용 목록 등록이 아니에요. 횟수가 처음부터 다시 세어지고, 계속 탐지되면 다시 차단됩니다. 절대 차단하지 않을 주소는 ASTERMEM_ALLOWED_IPS 를 사용하세요.",
 };
 
 export default dict;

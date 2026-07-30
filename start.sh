@@ -9,7 +9,7 @@
 # idempotent — already-done steps are skipped, repeated runs take only seconds.
 # Windows uses start.bat / start.ps1 with the same logic.
 # Key constraints:
-#   - Whether to reinstall deps / rebuild frontend is decided by mtime marker files, no
+#   - Whether to reinstall deps / rebuild frontend is decided by mtime comparison, no
 #     network checks, so offline boot works
 #   - Missing node/npm only warns, doesn't block (backend still serves /api/agent/call)
 #   - Does not touch data/ or config.yaml: port, credentials, etc. are decided by backend
@@ -46,7 +46,7 @@ usage() {
     cat <<'EOF'
 Usage: ./start.sh [options]
 
-  --rebuild-ui   Force rebuild the Web UI (use after changing web-ui/ source)
+  --rebuild-ui   Force rebuild the Web UI (normally detected automatically from source mtimes)
   --skip-ui      Skip frontend check, start backend directly
   --reinstall    Force reinstall Python dependencies
   -h, --help     Show this help
@@ -101,9 +101,23 @@ if [ ! -f "$REPO_DIR/.env" ] && [ -f "$REPO_DIR/.env.example" ]; then
     log "Generated .env from .env.example (fill in your API key and restart to enable semantic search)"
 fi
 
+# A present dist/ says nothing about whether it matches the current source: editing web-ui/
+# and restarting used to silently keep serving the previous bundle. Compare source mtimes
+# against the built entry instead, so a rebuild is only skipped when it is genuinely current.
+ui_is_stale() {
+    [ -f "$UI_ENTRY" ] || return 0
+    local newer
+    newer="$(find "$REPO_DIR/web-ui" \
+        -name node_modules -prune -o \
+        -name dist -prune -o \
+        -name '*.tsbuildinfo' -prune -o \
+        -type f -newer "$UI_ENTRY" -print -quit 2>/dev/null)"
+    [ -n "$newer" ]
+}
+
 if [ "$SKIP_UI" = 1 ]; then
     log "Skipped frontend check (--skip-ui)"
-elif [ "$REBUILD_UI" = 1 ] || [ ! -f "$UI_ENTRY" ]; then
+elif [ "$REBUILD_UI" = 1 ] || ui_is_stale; then
     if command -v npm >/dev/null 2>&1; then
         cd "$REPO_DIR/web-ui"
         if [ ! -d node_modules ]; then
@@ -118,7 +132,7 @@ elif [ "$REBUILD_UI" = 1 ] || [ ! -f "$UI_ENTRY" ]; then
         warn "After installing Node.js 18+, run ./start.sh --rebuild-ui to build the frontend"
     fi
 else
-    log "Web UI build is up to date (add --rebuild-ui to force rebuild)"
+    log "Web UI build is up to date (newer than all web-ui/ sources)"
 fi
 
 log "Starting AsterMem... (Ctrl+C to stop; default credentials: admin / admin)"

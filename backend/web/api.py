@@ -3372,6 +3372,7 @@ async def get_embeddings_for_visualization(
                 "source": memory.source if memory else metadata.get("source", "unknown"),
                 "is_image": is_image,
                 "content_type": content_type,
+                "created_at": memory.created_at.isoformat() if memory and memory.created_at else None,
             }
             
             # Add content summary
@@ -3744,6 +3745,9 @@ async def get_trunk_embeddings_for_visualization(
                 is_image = True
                 content_type = "image"
             
+            # Trunks inherit the document's timestamp when they carry none of their own
+            created = (trunk.created_at if trunk else None) or (doc.created_at if doc else None)
+            
             point = {
                 "id": trunk_id,
                 "x": float(coords_3d[i][0]),
@@ -3759,6 +3763,7 @@ async def get_trunk_embeddings_for_visualization(
                 "source": doc.source if doc else "unknown",
                 "is_image": is_image,
                 "content_type": content_type,
+                "created_at": created.isoformat() if created else None,
             }
             
             # Add content summary

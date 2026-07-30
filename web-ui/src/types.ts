@@ -179,6 +179,11 @@ export interface EmbeddingPoint {
   tag?: string;
   tags?: string[];
   cluster?: number | string;
+  priority?: number;
+  source?: string;
+  is_image?: boolean;
+  content_type?: string;
+  created_at?: string | null;
   [key: string]: unknown;
 }
 

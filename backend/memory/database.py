@@ -432,6 +432,21 @@ class Database:
                 ON profile_field_history(key, id DESC)
             """)
 
+            # Write-time arbitration audit log: every arbitration decision (including
+            # keep_both) is recorded with the LLM's reasoning; archived memories are
+            # soft-deleted and restorable, this log is how the user traces "why"
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS arbitration_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    new_memory_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    target_ids TEXT,
+                    archived_ids TEXT,
+                    reason TEXT,
+                    created_at TEXT
+                )
+            """)
+
             # Migration: add new columns to existing tables (if not present)
             self._migrate_add_column(cursor, "memories", "trunk_ids", "TEXT")
             self._migrate_add_column(cursor, "memories", "trunk_status", "TEXT DEFAULT 'not_chunked'")
@@ -535,6 +550,36 @@ class Database:
             datetime.now().isoformat(),
         ))
     
+    def add_arbitration_log(self, new_memory_id: str, action: str,
+                            target_ids: list, archived_ids: list, reason: str) -> int:
+        """Record a write-time arbitration decision (white-box audit trail)"""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """INSERT INTO arbitration_log
+                   (new_memory_id, action, target_ids, archived_ids, reason, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (new_memory_id, action,
+                 json.dumps(target_ids or [], ensure_ascii=False),
+                 json.dumps(archived_ids or [], ensure_ascii=False),
+                 reason or "", datetime.now().isoformat()),
+            )
+            return cursor.lastrowid
+
+    def list_arbitration_logs(self, limit: int = 50, offset: int = 0) -> List[dict]:
+        """List arbitration decisions, most recent first"""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM arbitration_log ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+            logs = []
+            for r in rows:
+                log = dict(r)
+                log["target_ids"] = json.loads(log.get("target_ids") or "[]")
+                log["archived_ids"] = json.loads(log.get("archived_ids") or "[]")
+                logs.append(log)
+            return logs
+
     def delete_memory(self, memory_id: str, hard_delete: bool = False) -> bool:
         """Delete a memory"""
         with self.get_connection() as conn:

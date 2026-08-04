@@ -48,6 +48,8 @@ Die tägliche Auswertung sieht nur den Zuwachs des jeweiligen Tages; Muster übe
 
 Die entscheidende Designentscheidung: **Tiefe Konsolidierung wird nie direkt wirksam.** Sie erzeugt eine Kandidatenversion; Sie prüfen den Diff (was hinzukam, was verschmolzen, was entfernt wurde) und übernehmen oder verwerfen ihn von Hand. Ausgelöst wird die Konsolidierung ereignisgesteuert — genug neuer Inhalt hat sich angesammelt, offene Punkte häufen sich, ein Massenimport ist abgeschlossen — nicht durch einen starren Cronjob. Menschen machen keinen Großputz nach Kalender; sie räumen auf, wenn es unordentlich aussieht.
 
+Die tiefe Konsolidierung hat auch einen leichtgewichtigen Begleiter im Alltag: das **Aufräumen beim Schreiben**. Sobald eine neue Erinnerung eintrifft, wird sie gegen ähnliche bestehende abgewogen — eine überholte Entscheidung wird abgelöst, ein bereits festgehaltener Fakt nicht doppelt gespeichert. Das Aufräumen archiviert nur, löscht nie; jede Entscheidung landet samt Begründung im Pflegeprotokoll, und alles Archivierte ist mit einem Klick zurückzuholen. Im Zweifel bleibt alles erhalten. Und wer eine Bibliothek ohne Handarbeit bevorzugt, kann Traum-Ergebnisse automatisch wirksam werden lassen — aber nur, wenn jede Schlussfolgerung die Prüfung besteht; alles Fragwürdige wartet weiterhin auf Sie.
+
 ## 7. Sichtbar, änderbar, abschaltbar
 
 Ein Profil ist die Zusammenfassung der KI über Sie — womöglich falsch, womöglich einseitig. Deshalb muss das Produkt drei Dinge garantieren:
@@ -65,5 +67,7 @@ AsterMem ist kein klassisches Dokumentenwerkzeug — es ist ein **Gedächtnis-Ba
 - Eine vollständige Tool-API (Suche, Lesen/Schreiben, Profil) mit Bearer-Token-Authentifizierung und Berechtigungsstufen für Lesen, Schreiben und destruktive Aktionen
 - Ein mitgeliefertes Skill-Paket: Cursor, Claude Code und andere Agenten installieren es und legen los
 - `quick_match` liefert Zeitkontext, die relevantesten Passagen und Wegweisung für den nächsten Schritt in einem einzigen Aufruf — gebaut für den Sitzungsbeginn
+- Mit `capture_conversation` kann ein Agent ein ganzes Gespräch übergeben: Der Text wird wortgetreu gespeichert, und was langfristig erinnernswert ist, wird im Hintergrund in eigenständige Erinnerungen destilliert, jede mit Verweis auf das Original — das Speichern hängt nicht mehr davon ab, dass der Agent ans Speichern denkt
+- Suchantworten unterliegen einem Zeichenbudget und einem harten Zeitlimit: Wie groß die Bibliothek auch wird, sie blockiert nie den Zug des Agenten
 
 Sie liefern das Erinnerungsmaterial. Die KI merkt sich, wer Sie sind. Das ist AsterMem.

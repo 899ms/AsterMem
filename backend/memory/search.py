@@ -7,7 +7,8 @@ AGPL-3.0 License
 
 import re
 import time
-from typing import List, Optional, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from typing import Any, Callable, Dict, List, Optional
 
 from .models import Memory, SearchResult, TrunkSearchResult
 from .database import Database
@@ -22,6 +23,11 @@ from .recall import (
 from .vector import VectorStore
 from .whoosh_search import WhooshSearch
 
+# Recall timeout: the memory system sits on the conversation's critical path; a hung
+# search backend (embedding service down, index lock) must never block the Agent's turn.
+# On timeout the slow path contributes nothing and whatever the other path returned is used.
+DEFAULT_SEARCH_TIMEOUT = 5.0
+
 
 class SearchEngine:
     """Search engine"""
@@ -35,6 +41,7 @@ class SearchEngine:
         min_similarity: float = DEFAULT_NOISE_FLOOR,
         relative_ratio: float = DEFAULT_RELATIVE_RATIO,
         min_keep: int = DEFAULT_MIN_KEEP,
+        timeout_seconds: float = DEFAULT_SEARCH_TIMEOUT,
     ):
         self.database = database
         self.vector_store = vector_store
@@ -46,6 +53,58 @@ class SearchEngine:
         self.min_similarity = clamp_noise_floor(min_similarity)
         self.relative_ratio = relative_ratio
         self.min_keep = min_keep
+        # <= 0 disables the guard (used by tests that assert exact sequential behavior)
+        self.timeout_seconds = float(timeout_seconds or 0)
+
+    def _run_paths_with_timeout(
+        self,
+        paths: Dict[str, Callable[[], list]],
+        debug_info: Dict[str, Any],
+    ) -> Dict[str, list]:
+        """
+        Run recall paths concurrently under a shared deadline.
+
+        Each path that finishes in time contributes its results; a path that exceeds
+        the deadline (or raises) contributes an empty list and is flagged in debug_info
+        ("<name>_timed_out" / "<name>_error"). The worker thread of a timed-out path is
+        abandoned, not joined — same trade-off as an HTTP client timeout.
+        """
+        results: Dict[str, list] = {name: [] for name in paths}
+        if not paths:
+            return results
+
+        if self.timeout_seconds <= 0:
+            # Guard disabled: run sequentially, preserving legacy behavior
+            for name, fn in paths.items():
+                start = time.time()
+                try:
+                    results[name] = fn()
+                    debug_info[f"{name}_count"] = len(results[name])
+                except Exception as e:
+                    debug_info[f"{name}_error"] = str(e)
+                debug_info[f"{name}_time_ms"] = int((time.time() - start) * 1000)
+            return results
+
+        deadline = time.time() + self.timeout_seconds
+        executor = ThreadPoolExecutor(max_workers=len(paths))
+        try:
+            futures = {name: executor.submit(fn) for name, fn in paths.items()}
+            for name, future in futures.items():
+                start = time.time()
+                remaining = max(0.0, deadline - time.time())
+                try:
+                    results[name] = future.result(timeout=remaining)
+                    debug_info[f"{name}_count"] = len(results[name])
+                except FutureTimeoutError:
+                    debug_info[f"{name}_timed_out"] = True
+                    print(f"[WARN] Search path '{name}' exceeded {self.timeout_seconds}s timeout, returning partial results")
+                except Exception as e:
+                    debug_info[f"{name}_error"] = str(e)
+                debug_info[f"{name}_time_ms"] = int((time.time() - start) * 1000)
+        finally:
+            # wait=False: never block the caller on an abandoned worker
+            executor.shutdown(wait=False)
+        return results
     
     def set_semantic_enabled(self, enabled: bool):
         """Set whether semantic search is enabled"""
@@ -101,24 +160,17 @@ class SearchEngine:
             "total_time_ms": 0,
         }
         
-        # Keyword search
+        # Run recall paths concurrently under a shared deadline; a hung path degrades
+        # to empty results instead of blocking the conversation (see _run_paths_with_timeout)
+        paths: Dict[str, Callable[[], list]] = {}
         if mode in ("keyword", "hybrid"):
-            keyword_start = time.time()
-            keyword_results = self._keyword_search(query, limit * 2)
-            debug_info["keyword_time_ms"] = int((time.time() - keyword_start) * 1000)
-            debug_info["keyword_count"] = len(keyword_results)
-            results.extend(keyword_results)
-        
-        # Semantic search
+            paths["keyword"] = lambda: self._keyword_search(query, limit * 2)
         if mode in ("semantic", "hybrid") and self.semantic_enabled and self.vector_store:
-            semantic_start = time.time()
-            try:
-                semantic_results = self._semantic_search(query, limit * 2, min_score)
-                debug_info["semantic_time_ms"] = int((time.time() - semantic_start) * 1000)
-                debug_info["semantic_count"] = len(semantic_results)
-                results.extend(semantic_results)
-            except Exception as e:
-                debug_info["semantic_error"] = str(e)
+            paths["semantic"] = lambda: self._semantic_search(query, limit * 2, min_score)
+        
+        path_results = self._run_paths_with_timeout(paths, debug_info)
+        for path_result in path_results.values():
+            results.extend(path_result)
         
         # Merge and deduplicate (pass query for dynamic weights)
         merged_results = self._merge_results(results, limit, query=query)
@@ -389,27 +441,17 @@ class SearchEngine:
             "total_time_ms": 0,
         }
         
-        # Keyword search Trunk
+        # Run recall paths concurrently under a shared deadline; a hung path degrades
+        # to empty results instead of blocking the conversation (see _run_paths_with_timeout)
+        paths: Dict[str, Callable[[], list]] = {}
         if mode in ("keyword", "hybrid") and self.whoosh_search:
-            keyword_start = time.time()
-            try:
-                keyword_results = self._trunk_keyword_search(query, limit * 2)
-                debug_info["keyword_time_ms"] = int((time.time() - keyword_start) * 1000)
-                debug_info["keyword_count"] = len(keyword_results)
-                results.extend(keyword_results)
-            except Exception as e:
-                debug_info["keyword_error"] = str(e)
-        
-        # Semantic search Trunk
+            paths["keyword"] = lambda: self._trunk_keyword_search(query, limit * 2)
         if mode in ("semantic", "hybrid") and self.semantic_enabled and self.vector_store:
-            semantic_start = time.time()
-            try:
-                semantic_results = self._trunk_semantic_search(query, limit * 2, min_score)
-                debug_info["semantic_time_ms"] = int((time.time() - semantic_start) * 1000)
-                debug_info["semantic_count"] = len(semantic_results)
-                results.extend(semantic_results)
-            except Exception as e:
-                debug_info["semantic_error"] = str(e)
+            paths["semantic"] = lambda: self._trunk_semantic_search(query, limit * 2, min_score)
+        
+        path_results = self._run_paths_with_timeout(paths, debug_info)
+        for path_result in path_results.values():
+            results.extend(path_result)
         
         # Merge and deduplicate (pass query for dynamic weights)
         merged_results = self._merge_trunk_results(results, limit, query=query)

@@ -85,6 +85,10 @@ class ConfigUpdate(BaseModel):
     min_similarity: Optional[float] = None
     api_log_max: Optional[int] = None
     output_language: Optional[str] = None     # UI locale code, or "auto" to follow each memory
+    # Automation toggles: modules read the live config dict, so these take effect immediately
+    arbitration_enabled: Optional[bool] = None   # tidy new memories on write (see memory/arbitration.py)
+    capture_enabled: Optional[bool] = None       # conversation capture + distillation (see memory/capture.py)
+    dream_auto_activate: Optional[bool] = None   # auditor-gated auto activation of dream results
 
 
 class LoginRequest(BaseModel):
@@ -270,6 +274,13 @@ def _config_view(include_catalog: bool = True) -> dict:
             }
         },
         "output_language": output_language.current(),
+        "automation": {
+            "arbitration_enabled": bool((_config.get("arbitration") or {}).get("enabled", True)),
+            "capture_enabled": bool((_config.get("capture") or {}).get("enabled", False)),
+            "dream_auto_activate": bool(
+                ((_config.get("profile") or {}).get("dream") or {}).get("auto_activate", False)
+            ),
+        },
         "server": {
             "port": _config.get("server", {}).get("port", _config.get("server", {}).get("mcp_port", 8765)),
             "api_log_max": _config.get("server", {}).get("api_log_max", 1000),
@@ -399,6 +410,12 @@ def _apply_config_update(data: ConfigUpdate) -> dict:
         # Normalized on the way in so an unsupported locale degrades to "auto" instead of being
         # written to config.yaml and reaching prompts as a language nobody asked for.
         _config["output_language"] = output_language.normalize(data.output_language)
+    if data.arbitration_enabled is not None:
+        _config.setdefault("arbitration", {})["enabled"] = data.arbitration_enabled
+    if data.capture_enabled is not None:
+        _config.setdefault("capture", {})["enabled"] = data.capture_enabled
+    if data.dream_auto_activate is not None:
+        _config.setdefault("profile", {}).setdefault("dream", {})["auto_activate"] = data.dream_auto_activate
 
     _save_config()
     return {"success": True, "requires_vector_rebuild": embedding_changed}
@@ -2855,7 +2872,7 @@ _AGENT_READ_TOOLS = {
 }
 _AGENT_WRITE_TOOLS = {
     "add_memory", "update_memory", "patch_memory", "delete_memory",
-    "update_trunk", "patch_trunk",
+    "update_trunk", "patch_trunk", "capture_conversation",
 }
 _AGENT_CONFIG_TOOLS = {
     "get_system_config", "configure_provider", "test_provider",
@@ -3014,6 +3031,11 @@ async def call_agent_tool(request: Request):
                 text=arguments.get("text"),
                 top_k=arguments.get("top_k", 6)
             )
+        elif tool_name == "capture_conversation":
+            result = memory_tools.capture_conversation(
+                content=arguments.get("content"),
+                session=arguments.get("session")
+            )
         elif tool_name == "get_profile":
             # Lazy import: api_profile depends on verify_session from this module; module-level mutual import would cause a cycle
             from web.api_profile import get_profile_service
@@ -3084,6 +3106,34 @@ async def call_agent_tool(request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Arbitration audit log ====================
+
+@router.get("/arbitration/logs")
+async def get_arbitration_logs(
+    limit: int = 50,
+    offset: int = 0,
+    admin_id: int = Depends(verify_session),
+):
+    """
+    Write-time arbitration decisions (white-box audit trail).
+    Each entry records what the LLM decided about a newly written memory
+    (keep_both / supersede / duplicate), which memories were soft-archived, and why.
+    Archived memories can be restored via PUT /api/memories/{id} with status=active.
+    """
+    sync = get_sync_manager()
+    logs = sync.database.list_arbitration_logs(limit=limit, offset=offset)
+    # Attach titles so the UI/user can read entries without extra lookups
+    for log in logs:
+        ids = {log["new_memory_id"], *log["target_ids"]}
+        titles = {}
+        for mid in ids:
+            memory = sync.database.get_memory(mid)
+            if memory:
+                titles[mid] = memory.title
+        log["titles"] = titles
+    return {"logs": logs}
 
 
 # ==================== API Log endpoints ====================

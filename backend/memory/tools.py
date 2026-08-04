@@ -32,15 +32,53 @@ def log_performance(func):
     return wrapper
 
 
+class RecallBudget:
+    """
+    Per-response recall budget.
+
+    Purpose: with AI as the only reader, a single oversized trunk or a long result
+    list silently inflates every conversation turn's token cost. The budget caps the
+    context injected per search response; anything cut off degrades to an ID + hint,
+    which fits the navigation-style API (the Agent can always drill down via get_trunk).
+    Both limits default to 0 = unlimited, preserving existing behavior.
+    """
+
+    TRUNCATE_HINT = "...(truncated by recall budget, use get_trunk for full text)"
+
+    def __init__(self, max_chars_per_trunk: int = 0, max_total_chars: int = 0):
+        self.per_trunk = max(0, int(max_chars_per_trunk or 0))
+        self.total = max(0, int(max_total_chars or 0))
+        self.used = 0
+
+    def clip(self, content: str) -> str:
+        """Apply per-trunk and total limits to one content block; tracks running total."""
+        if self.total and self.used >= self.total:
+            return self.TRUNCATE_HINT
+        text = content
+        if self.per_trunk and len(text) > self.per_trunk:
+            text = text[:self.per_trunk] + self.TRUNCATE_HINT
+        if self.total and self.used + len(text) > self.total:
+            room = self.total - self.used
+            text = text[:max(room, 0)] + self.TRUNCATE_HINT
+        self.used += len(text)
+        return text
+
+
 class MemoryTools:
     """MCP Memory Toolkit"""
     
-    def __init__(self, sync_manager: SyncManager, search_engine: SearchEngine):
+    def __init__(self, sync_manager: SyncManager, search_engine: SearchEngine,
+                 config: Optional[dict] = None):
         self.sync = sync_manager
         self.search = search_engine
+        self.config = config or {}
         # Chunking callbacks (set externally to avoid circular dependencies)
         self._on_document_changed: Optional[Callable[[str], None]] = None
         self._on_document_updated: Optional[Callable[[str], None]] = None
+        # Write-time conflict arbitrator (set externally, optional)
+        self._arbitrator = None
+        # Conversation capture service (set externally, optional)
+        self._capture_service = None
     
     def set_chunking_callbacks(
         self,
@@ -56,6 +94,21 @@ class MemoryTools:
         """
         self._on_document_changed = on_document_changed
         self._on_document_updated = on_document_updated
+    
+    def set_arbitrator(self, arbitrator):
+        """Set the write-time conflict arbitrator (see memory/arbitration.py)"""
+        self._arbitrator = arbitrator
+    
+    def set_capture_service(self, capture_service):
+        """Set the conversation capture service (see memory/capture.py)"""
+        self._capture_service = capture_service
+    
+    def _new_budget(self) -> RecallBudget:
+        budget_cfg = (self.config.get("search") or {}).get("recall_budget") or {}
+        return RecallBudget(
+            max_chars_per_trunk=budget_cfg.get("max_chars_per_trunk", 0),
+            max_total_chars=budget_cfg.get("max_total_chars", 0),
+        )
     
     @log_performance
     def add_memory(
@@ -92,6 +145,12 @@ class MemoryTools:
                     self._on_document_changed(memory.id)
                 except Exception as e:
                     print(f"[WARN] Chunking trigger failed: {e}")
+            
+            # Write-time conflict arbitration (background; never blocks the write).
+            # The memory is already persisted — arbitration can only archive (soft),
+            # never lose data. See memory/arbitration.py.
+            if self._arbitrator and self._arbitrator.is_enabled():
+                _run_background(self._arbitrator.arbitrate, memory.id)
             
             tags_str = ", ".join(memory.tags) if memory.tags else "none"
             return f"Added: {memory.title} | {memory.id}"
@@ -393,6 +452,7 @@ class MemoryTools:
             lines = [f"Search results ({len(trunk_results)} related trunks)\n"]
             
             seen_docs = set()
+            budget = self._new_budget()
             
             for i, r in enumerate(trunk_results, 1):
                 trunk = r["trunk"]
@@ -407,8 +467,8 @@ class MemoryTools:
                     lines.append(f"\n📄 {doc_title} (doc: {doc_id})")
                     lines.append("-" * 40)
                 
-                # Show trunk content
-                content = trunk["content"]
+                # Show trunk content (subject to recall budget)
+                content = budget.clip(trunk["content"])
                 tags = trunk.get("tags", [])
                 tags_str = f" [{', '.join(tags)}]" if tags else ""
                 
@@ -864,6 +924,28 @@ class MemoryTools:
         except Exception as e:
             return f"❌ patch_memory failed: {str(e)}"
     
+    def capture_conversation(self, content: str, session: Optional[str] = None) -> str:
+        """
+        Capture a conversation round for automatic memory distillation
+        
+        The raw text is stored verbatim immediately (tag capture/raw); facts worth
+        remembering are extracted in the background into separate memories
+        (tag capture/distilled) with a source link back to the raw log.
+        
+        Args:
+            content: Conversation text (user + assistant turns, any format)
+            session: Optional session label for grouping
+        
+        Returns:
+            Operation result message
+        """
+        if not self._capture_service:
+            return "Error: Capture service is not available on this server"
+        try:
+            return self._capture_service.capture(content, session=session)
+        except Exception as e:
+            return f"Error: Capture failed - {str(e)}"
+    
     def quick_match(self, text: str, top_k: int = 6) -> str:
         """
         Quick match memories (recommended: use first for initial conversations or short user input)
@@ -923,6 +1005,7 @@ class MemoryTools:
                 lines.append(f"[Related trunks: {len(trunk_results)}]\n")
             
             seen_docs = set()
+            budget = self._new_budget()
             
             for i, r in enumerate(trunk_results, 1):
                 trunk = r["trunk"]
@@ -944,14 +1027,15 @@ class MemoryTools:
                 lines.append(f"\n[Trunk {trunk['order']+1}]{tags_str} ({score:.0%})")
                 lines.append(f"trunk_id: {trunk_id}")
                 
-                # High-confidence match: expand all; normal match: show first 200 chars
+                # High-confidence match: expand all; normal match: show first 200 chars.
+                # Either way the recall budget applies (see RecallBudget).
                 if top_score >= 0.7 or i == 1:
-                    lines.append(f"{content}")
+                    lines.append(budget.clip(content))
                 else:
                     preview = content[:200].replace("\n", " ")
                     if len(content) > 200:
                         preview += "..."
-                    lines.append(f"{preview}")
+                    lines.append(budget.clip(preview))
                 
                 # Get related trunks (first result only)
                 if i == 1 and self.search.vector_store:

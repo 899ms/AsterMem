@@ -45,6 +45,9 @@ export function SettingsPage() {
   const [embeddingProvider, setEmbeddingProvider] = useState("");
   const [chatProvider, setChatProvider] = useState("");
   const [semanticEnabled, setSemanticEnabled] = useState(true);
+  const [tidyEnabled, setTidyEnabled] = useState(true);
+  const [captureEnabled, setCaptureEnabled] = useState(false);
+  const [dreamAutoApply, setDreamAutoApply] = useState(false);
   const [minSimilarity, setMinSimilarity] = useState(0.15);
   // Upper limit provided by backend: this value is just the noise floor; setting it too high zeroes out all semantic recall
   const [minSimilarityMax, setMinSimilarityMax] = useState(0.4);
@@ -80,6 +83,9 @@ export function SettingsPage() {
       setEmbeddingProvider(res?.active?.embedding_provider ?? "");
       setChatProvider(res?.active?.chat_provider ?? "");
       setSemanticEnabled(res?.search?.semantic?.enabled ?? true);
+      setTidyEnabled(res?.automation?.arbitration_enabled ?? true);
+      setCaptureEnabled(res?.automation?.capture_enabled ?? false);
+      setDreamAutoApply(res?.automation?.dream_auto_activate ?? false);
       const floorMax = res?.search?.semantic?.min_similarity_max ?? 0.4;
       setMinSimilarityMax(floorMax);
       setMinSimilarity(Math.min(res?.search?.semantic?.min_similarity ?? 0.15, floorMax));
@@ -132,7 +138,13 @@ export function SettingsPage() {
    * (backend supports partial updates), avoiding accidental submission of provider drafts.
    * Slider saves on pointer-up/key-up.
    */
-  const saveSearchSettings = async (payload: { semantic_enabled?: boolean; min_similarity?: number }) => {
+  const saveSearchSettings = async (payload: {
+    semantic_enabled?: boolean;
+    min_similarity?: number;
+    arbitration_enabled?: boolean;
+    capture_enabled?: boolean;
+    dream_auto_activate?: boolean;
+  }) => {
     try {
       await api("PUT", "/api/config", payload);
       emitToast("success", t("Configuration saved"));
@@ -444,6 +456,52 @@ export function SettingsPage() {
                     {t("Noise floor only; relevance is judged automatically")}
                   </span>
                 </label>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-head"><span className="kicker">{t("Automation")}</span></div>
+              <div className="panel-body settings-search-options">
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={tidyEnabled} onChange={(e) => {
+                    setTidyEnabled(e.target.checked);
+                    void saveSearchSettings({ arbitration_enabled: e.target.checked });
+                  }} />
+                  {t("Tidy up new memories")}
+                </label>
+                <span className="field-note">
+                  {t("Each new memory is checked against similar older ones; outdated or duplicated entries are archived — never deleted. Every decision is recorded in the upkeep trail.")}
+                </span>
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={captureEnabled} onChange={(e) => {
+                    setCaptureEnabled(e.target.checked);
+                    void saveSearchSettings({ capture_enabled: e.target.checked });
+                  }} />
+                  {t("Conversation capture")}
+                </label>
+                <span className="field-note">
+                  {t("Agents may hand over a conversation: it is kept verbatim, and the parts worth remembering are distilled into memories, each linked back to the original.")}
+                </span>
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={dreamAutoApply} onChange={(e) => {
+                    setDreamAutoApply(e.target.checked);
+                    void saveSearchSettings({ dream_auto_activate: e.target.checked });
+                  }} />
+                  {t("Apply dream results automatically")}
+                </label>
+                <span className="field-note">
+                  {t("Only when every conclusion passes review; anything questionable still waits for your confirmation.")}
+                </span>
+                {!chatProvider && (tidyEnabled || captureEnabled) && (
+                  <span className="field-note text-danger">
+                    {t("These features need an active chat model; until one is configured they stay dormant.")}
+                  </span>
+                )}
+                <div>
+                  <Link className="btn small" to="/logs?view=upkeep">
+                    {t("View upkeep trail")}
+                  </Link>
+                </div>
               </div>
             </div>
 

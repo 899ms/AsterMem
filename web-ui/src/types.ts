@@ -108,7 +108,24 @@ export interface AppConfig {
   search?: {
     semantic?: { enabled?: boolean; min_similarity?: number; min_similarity_max?: number };
   };
+  automation?: {
+    arbitration_enabled?: boolean;
+    capture_enabled?: boolean;
+    dream_auto_activate?: boolean;
+  };
   server?: { port?: number };
+}
+
+/** One entry of the memory upkeep trail (write-time tidy decisions). */
+export interface UpkeepLogItem {
+  id: number;
+  new_memory_id: string;
+  action: "keep_both" | "supersede" | "duplicate" | string;
+  target_ids: string[];
+  archived_ids: string[];
+  reason?: string;
+  created_at?: string;
+  titles?: Record<string, string>;
 }
 
 export interface VectorRebuildStatus {

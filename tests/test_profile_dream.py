@@ -177,6 +177,46 @@ def test_dream_pipeline_review_and_activate(client, dream_env):
     assert merged and len(merged[0]["sources"]) == 2
 
 
+def test_dream_auto_activate_when_clean(client, dream_env):
+    """auto_activate=true: candidate with zero pending claims goes live without human review"""
+    services, _fake, config, _seeds, old_vid = dream_env
+    svc = services["profile_service"]
+    dream_mgr = services["dream_manager"]
+    config["profile"]["dream"]["auto_activate"] = True
+
+    dream = dream_mgr.start_dream(trigger_reason="manual", synchronous=True)
+    dream = dream_mgr.get_dream(dream["id"])
+    # Auditor gate passed (FakeChat reviewer approves everything) → applied, not review
+    assert dream["status"] == "applied", dream.get("error")
+    assert svc.get_active_version_id() == dream["output_version_id"]
+    assert svc.get_active_version_id() != old_vid
+
+
+def test_auto_activate_gate_blocks_pending_claims(dream_env):
+    """A candidate holding any pending-status claim must stay in review (auditor gate)"""
+    services, _fake, _config, _seeds, _vid = dream_env
+    svc = services["profile_service"]
+    dream_mgr = services["dream_manager"]
+    old_active = svc.get_active_version_id()
+
+    # Build a synthetic candidate with one conflicted claim
+    with services["database"].get_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO profile_versions (status, origin, created_at) "
+            "VALUES ('candidate', 'dream', datetime('now'))")
+        candidate_vid = cursor.lastrowid
+    svc.insert_claim(candidate_vid, "recent", "conflicted fact", ["mem_x"],
+                     status="conflict")
+
+    assert dream_mgr._try_auto_activate(candidate_vid) is False
+    # Still a candidate; active version untouched
+    with services["database"].get_connection() as conn:
+        row = conn.execute("SELECT status FROM profile_versions WHERE id = ?",
+                           (candidate_vid,)).fetchone()
+    assert row["status"] == "candidate"
+    assert svc.get_active_version_id() == old_active
+
+
 def test_dream_discard(client, dream_env):
     services, fake, _config, _seeds, _vid = dream_env
     dream_mgr = services["dream_manager"]

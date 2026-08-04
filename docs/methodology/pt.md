@@ -48,6 +48,8 @@ A síntese diária só enxerga o incremento de cada dia; ela não consegue perce
 
 O design essencial: **a consolidação profunda nunca entra em vigor diretamente.** Ela produz uma versão candidata; você revisa o diff (o que foi adicionado, mesclado, removido) e a adota ou descarta manualmente. A consolidação é orientada por eventos — conteúdo novo suficiente acumulado, pendências se empilhando, uma importação em massa concluída — e não um cron rígido. Ninguém faz faxina pesada em horário fixo; a gente limpa quando a bagunça aparece.
 
+A consolidação profunda também tem um companheiro leve para o dia a dia: **a arrumação na escrita**. Sempre que uma memória nova chega, ela é pesada contra memórias semelhantes já existentes — uma decisão ultrapassada é substituída, um fato já registrado não é guardado duas vezes. A arrumação apenas arquiva, nunca apaga; cada decisão fica registrada com seu raciocínio na trilha de manutenção, e tudo que foi arquivado volta com um clique. Na dúvida, tudo é mantido. E se você prefere uma biblioteca sem intervenção, os resultados do sonho podem entrar em vigor automaticamente — mas só quando cada conclusão passa pela auditoria; qualquer ponto duvidoso continua esperando por você.
+
 ## 7. Visível, editável, desligável
 
 Um perfil é o resumo que a IA faz de você — possivelmente errado, possivelmente parcial. Por isso o produto precisa garantir três coisas:
@@ -65,5 +67,7 @@ O AsterMem não é uma ferramenta tradicional de documentos — é um **backend 
 - Uma API de ferramentas completa (busca, leitura/escrita, perfil) com autenticação por token Bearer e níveis de permissão de leitura/escrita/ações destrutivas
 - Um pacote de Skill incluído: Cursor, Claude Code e outros agentes instalam e usam na hora
 - `quick_match` retorna, em uma única chamada, o contexto temporal + os trechos mais relevantes + a orientação para o próximo passo, pensado para a abertura de sessões
+- `capture_conversation` permite ao agente entregar uma conversa inteira: o texto é guardado literalmente, e o que merece ser lembrado a longo prazo é destilado em segundo plano em memórias independentes, cada uma ligada ao original — salvar não depende mais de o agente lembrar de salvar
+- As respostas de busca operam sob um orçamento de caracteres e um limite de tempo rígido: por maior que a biblioteca fique, ela nunca trava o turno do agente
 
 Você fornece o material de memória. A IA lembra quem você é. Isso é o AsterMem.

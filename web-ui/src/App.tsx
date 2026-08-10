@@ -28,6 +28,7 @@ import { LogsPage } from "./pages/LogsPage";
 import { UsagePage } from "./pages/UsagePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AdminPage } from "./pages/AdminPage";
+import { SecurityPage } from "./pages/SecurityPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { MethodologyPage } from "./pages/MethodologyPage";
 import { PlaygroundPage } from "./pages/PlaygroundPage";
@@ -113,6 +114,7 @@ export function App() {
                   <Route path="/usage" element={<UsagePage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/security" element={<SecurityPage />} />
                   {import.meta.env.DEV && <Route path="/playground" element={<PlaygroundPage />} />}
                   <Route path="*" element={<Navigate to="/home" replace />} />
                 </Routes>

@@ -264,20 +264,22 @@ class _FailingClient(_FakeClient):
     failures = 0
     status = 429
     headers: dict = {}
+    body = ""
 
     @classmethod
-    def reset(cls, failures, status=429, headers=None):
+    def reset(cls, failures, status=429, headers=None, body=""):
         cls.calls = 0
         cls.failures = failures
         cls.status = status
         cls.headers = headers or {}
+        cls.body = body
 
     def post(self, url, headers=None, json=None):
         _FailingClient.calls += 1
         if _FailingClient.calls <= _FailingClient.failures:
             request = httpx.Request("POST", url)
             response = httpx.Response(_FailingClient.status, headers=_FailingClient.headers,
-                                      request=request)
+                                      request=request, text=_FailingClient.body)
             raise httpx.HTTPStatusError("upstream refused", request=request, response=response)
         return super().post(url, headers=headers, json=json)
 
@@ -341,6 +343,74 @@ def test_gemini_embedding_retries_through_rate_limit(failing_http):
     emb = GeminiEmbedding("https://generativelanguage.googleapis.com/v1beta", "models/m", "gk-1")
     assert len(emb.embed("hi")) == 8
     assert client.calls == 2
+
+
+# ---------- Inputs the endpoint would refuse ----------
+#
+# An embedding call that fails leaves the memory stored and searchable by keyword, so nothing looks
+# broken until someone notices it never comes back from semantic search. These two inputs fail that
+# way permanently, unlike an outage, which the retries above already cover.
+
+def test_an_input_past_the_window_is_brought_inside_it(fake_http):
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    emb.embed("长" * 40000)
+    assert len(fake_http.last_request["json"]["input"]) == providers._EMBEDDING_MAX_CHARS
+
+
+def test_input_within_the_window_is_sent_untouched(fake_http):
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    text = "字" * (providers._EMBEDDING_MAX_CHARS - 1)
+    emb.embed(text)
+    assert fake_http.last_request["json"]["input"] == text
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\n\n"])
+def test_a_blank_input_is_sent_as_something_acceptable(fake_http, blank):
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    assert emb.embed(blank) == [0.1, 0.2, 0.3]
+    assert fake_http.last_request["json"]["input"].strip() == ""
+    assert fake_http.last_request["json"]["input"] != ""
+
+
+def test_one_oversized_member_does_not_take_its_batch_down(fake_http):
+    """A rejected request loses every vector in it, not just the offending one."""
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    texts = ["fine"] * 9 + ["长" * 40000]
+    assert len(emb.embed_batch(texts)) == 10
+    assert all(len(sent) <= providers._EMBEDDING_MAX_CHARS
+               for sent in fake_http.last_request["json"]["input"])
+
+
+def test_gemini_is_held_to_its_own_smaller_window(fake_http):
+    """Google's embedding models take 2048 tokens, a quarter of what the others accept."""
+    emb = GeminiEmbedding("https://generativelanguage.googleapis.com/v1beta", "models/m", "gk-1")
+    emb.embed("长" * 40000)
+    sent = fake_http.last_request["json"]["content"]["parts"][0]["text"]
+    assert len(sent) == providers._GEMINI_MAX_CHARS
+    assert providers._GEMINI_MAX_CHARS < providers._EMBEDDING_MAX_CHARS
+
+
+def test_a_refusal_is_reported_with_what_the_upstream_said(failing_http):
+    """
+    httpx summarises a 400 as the status line and the url, which is the same text whatever the
+    upstream objected to. The reply body is the only copy of the reason, and dropping it is what
+    made a reproducible rejection look like an unexplained gap in the index.
+    """
+    client, _ = failing_http
+    client.reset(failures=99, status=400,
+                 body='{"error":{"message":"Range of input length should be [1, 8192]"}}')
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    with pytest.raises(ConnectionError, match=r"Range of input length"):
+        emb.embed("hello")
+
+
+def test_a_refusal_without_a_body_keeps_the_original_message(failing_http):
+    """Not every upstream explains itself; the transport's own description is what is left."""
+    client, _ = failing_http
+    client.reset(failures=99, status=400)
+    emb = OpenAICompatibleEmbedding("https://asterove.com/api/v1", "m", "sk", "Asterove")
+    with pytest.raises(ConnectionError, match=r"upstream refused"):
+        emb.embed("hello")
 
 
 def test_chat_generate_tags_parses_result(fake_http):

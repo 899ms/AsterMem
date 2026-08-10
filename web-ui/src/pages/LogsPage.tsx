@@ -3,18 +3,23 @@
  * row click lazily loads GET /api/logs/{id} detail expansion, supports clearing all logs.
  * Design intent: Expanded rows are inline below the table row (details row), avoiding modals
  * that interrupt browsing flow; request/response bodies displayed as JSON in pre elements.
+ * A second tab shows the memory upkeep trail (write-time tidy decisions): the white-box
+ * principle demands that every automatic archive is explained on screen and reversible
+ * in one click, right where the user would look for "what did the system just do".
  * Key constraint: Clear is destructive and requires confirmation; status column >=400 is shown in red.
  */
 import { useCallback, useEffect, useState } from "react";
-import { IconTrash } from "@tabler/icons-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { IconArrowBackUp, IconTrash } from "@tabler/icons-react";
 import { Layout } from "../components/Layout";
 import { ConfirmModal } from "../components/Modal";
 import { EmptyState, LoadingLine } from "../components/EmptyState";
 import { Pagination } from "../components/Pagination";
+import { Tabs } from "../components/Tabs";
 import { api, reportError } from "../api";
 import { emitToast } from "../toast";
 import { useI18n } from "../i18n";
-import type { LogItem } from "../types";
+import type { LogItem, UpkeepLogItem } from "../types";
 
 const PAGE_SIZE = 50;
 
@@ -34,8 +39,131 @@ function pretty(value: unknown): string {
   }
 }
 
+/** Memory upkeep trail: what the write-time tidy pass decided, why, and one-click undo. */
+function UpkeepTrail() {
+  const { t } = useI18n();
+  const [logs, setLogs] = useState<UpkeepLogItem[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [restoring, setRestoring] = useState("");
+
+  const load = useCallback(async (nextOffset: number) => {
+    setLoading(true);
+    try {
+      const res = await api<{ logs?: UpkeepLogItem[] }>(
+        "GET", `/api/arbitration/logs?limit=${PAGE_SIZE}&offset=${nextOffset}`,
+      );
+      setLogs(Array.isArray(res?.logs) ? res.logs : []);
+      setOffset(nextOffset);
+    } catch (err) {
+      reportError(err, t("Unable to load logs"));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void load(0);
+  }, [load]);
+
+  const restore = async (memoryId: string) => {
+    setRestoring(memoryId);
+    try {
+      await api("PUT", `/api/memories/${memoryId}`, { status: "active" });
+      emitToast("success", t("Memory restored"));
+      void load(offset);
+    } catch (err) {
+      reportError(err, t("Unable to restore memory"));
+    } finally {
+      setRestoring("");
+    }
+  };
+
+  const actionLabel = (action: string) => {
+    if (action === "supersede") return t("Replaced by newer");
+    if (action === "duplicate") return t("Already known");
+    return t("Kept side by side");
+  };
+
+  const titleOf = (log: UpkeepLogItem, id: string) => log.titles?.[id] || id;
+  const timeOf = (value?: string) => String(value ?? "").slice(0, 19).replace("T", " ");
+
+  return (
+    <>
+      <p className="muted">
+        {t("When tidy-up is on, each new memory is weighed against similar older ones. Decisions land here with their reasoning; anything archived can be brought back.")}
+      </p>
+      {loading ? (
+        <LoadingLine label={t("Loading")} />
+      ) : logs.length === 0 ? (
+        <EmptyState message={t("No upkeep decisions yet")} />
+      ) : (
+        <table className="table logs-table">
+          <thead>
+            <tr>
+              <th>{t("Time")}</th>
+              <th>{t("Decision")}</th>
+              <th>{t("Memories involved")}</th>
+              <th>{t("Reasoning")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((log) => (
+              <tr key={log.id}>
+                <td className="mono-sm">{timeOf(log.created_at)}</td>
+                <td>{actionLabel(log.action)}</td>
+                <td>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <span>
+                      <Link to={`/view/${log.new_memory_id}`}>{titleOf(log, log.new_memory_id)}</Link>
+                      {log.archived_ids.includes(log.new_memory_id) && (
+                        <>
+                          {" "}
+                          <span className="muted mono-sm">({t("archived")})</span>{" "}
+                          <button type="button" className="btn small" disabled={restoring === log.new_memory_id}
+                            onClick={() => void restore(log.new_memory_id)}>
+                            <IconArrowBackUp aria-hidden="true" />
+                            {t("Restore")}
+                          </button>
+                        </>
+                      )}
+                    </span>
+                    {log.target_ids.map((id) => (
+                      <span key={id} className="muted">
+                        ↔ <Link to={`/view/${id}`}>{titleOf(log, id)}</Link>
+                        {log.archived_ids.includes(id) && (
+                          <>
+                            {" "}
+                            <span className="mono-sm">({t("archived")})</span>{" "}
+                            <button type="button" className="btn small" disabled={restoring === id}
+                              onClick={() => void restore(id)}>
+                              <IconArrowBackUp aria-hidden="true" />
+                              {t("Restore")}
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="muted" style={{ maxWidth: 360 }}>{log.reason || ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {!loading && (
+        <Pagination offset={offset} limit={PAGE_SIZE} total={undefined} pageCount={logs.length}
+          onPage={(o) => void load(o)} />
+      )}
+    </>
+  );
+}
+
 export function LogsPage() {
   const { t } = useI18n();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = searchParams.get("view") === "upkeep" ? "upkeep" : "api";
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [total, setTotal] = useState<number | undefined>(undefined);
   const [offset, setOffset] = useState(0);
@@ -64,8 +192,8 @@ export function LogsPage() {
   }, [t]);
 
   useEffect(() => {
-    void load(0);
-  }, [load]);
+    if (view === "api") void load(0);
+  }, [load, view]);
 
   const toggleRow = async (log: LogItem) => {
     if (log.id === undefined) return;
@@ -106,14 +234,25 @@ export function LogsPage() {
   return (
     <Layout
       title={t("Logs")}
-      actions={
+      actions={view === "api" ? (
         <button type="button" className="btn danger" onClick={() => setConfirmClear(true)}>
           <IconTrash aria-hidden="true" />
           {t("Clear logs")}
         </button>
-      }
+      ) : undefined}
     >
-      {loading ? (
+      <Tabs
+        items={[
+          { key: "api", label: t("API calls") },
+          { key: "upkeep", label: t("Upkeep trail") },
+        ]}
+        active={view}
+        onChange={(key) => setSearchParams(key === "upkeep" ? { view: "upkeep" } : {})}
+      />
+
+      {view === "upkeep" ? (
+        <UpkeepTrail />
+      ) : loading ? (
         <LoadingLine label={t("Loading")} />
       ) : logs.length === 0 ? (
         <EmptyState message={t("No API calls recorded yet")} />
@@ -174,7 +313,7 @@ export function LogsPage() {
           </tbody>
         </table>
       )}
-      {!loading && (
+      {view === "api" && !loading && (
         <Pagination offset={offset} limit={PAGE_SIZE} total={total} pageCount={logs.length} onPage={(o) => void load(o)} />
       )}
 

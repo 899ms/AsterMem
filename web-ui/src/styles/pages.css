@@ -1062,6 +1062,84 @@
   pointer-events: none;
 }
 
+/*
+ * Embedding legend: floats inside the canvas so it costs no layout height, bottom-left to stay clear
+ * of the preview drawer. Long tag lists scroll inside the panel instead of growing over the plot.
+ */
+.viz-legend {
+  position: absolute;
+  z-index: 5;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 220px;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  background: rgba(241, 239, 232, 0.92);
+}
+
+.viz-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 5px;
+  border: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.viz-legend-item:hover {
+  background: rgba(21, 22, 19, 0.06);
+}
+
+.viz-legend-item.active {
+  background: var(--acid);
+}
+
+.viz-legend-item i {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(21, 22, 19, 0.35);
+}
+
+.viz-legend-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-legend-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+.viz-legend-scale {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-legend-scale i {
+  width: 120px;
+  height: 9px;
+  border: 1px solid rgba(21, 22, 19, 0.35);
+}
+
+.viz-legend-scale .viz-legend-count {
+  margin-left: 0;
+}
+
 .entity-drawer {
   position: absolute;
   z-index: 6;
@@ -1133,6 +1211,19 @@
     border: 0;
     border-top: 1px solid var(--ink);
     box-shadow: 0 -6px 24px rgba(21, 22, 19, 0.18);
+  }
+
+  /* The bottom sheet owns the lower half on phones, so the legend moves to the top-left corner */
+  .viz-legend {
+    top: 10px;
+    bottom: auto;
+    left: 10px;
+    max-width: 150px;
+    max-height: 34%;
+  }
+
+  .viz-legend-scale i {
+    width: 84px;
   }
 }
 

@@ -30,6 +30,9 @@ def app_bundle(tmp_path_factory):
     config = {
         "auth": {"default_password": TEST_PASSWORD, "salt": "test_salt"},
         "search": {"keyword": {"enabled": True}, "semantic": {"enabled": False, "min_similarity": 0.3}},
+        # Off in the shared app: background arbitration would try to reach the (fake) chat
+        # provider on every memory write; arbitration tests inject their own fake chat
+        "arbitration": {"enabled": False},
         "server": {"port": 8999, "api_log_max": 100},
         "storage": {
             "data_dir": str(tmp / "data"),

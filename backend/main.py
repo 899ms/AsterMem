@@ -34,7 +34,9 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(ROOT_DIR, ".env"))
 
 from memory.api_logger import init_api_logger
+from memory.arbitration import WriteArbitrator
 from memory.auth import AuthManager
+from memory.capture import CaptureService
 from memory.usage_tracker import init_usage_tracker
 from memory.database import Database
 from memory.demo_mode import DemoReadOnlyMiddleware, is_demo_mode, seed_demo_library
@@ -62,7 +64,21 @@ DEFAULT_CONFIG = {
     "output_language": "auto",
     # min_similarity is the noise floor for semantic recall, not a relevance threshold:
     # relevance is determined relatively by recall.adaptive_cutoff using the best hit as anchor (see memory/recall.py)
-    "search": {"keyword": {"enabled": True}, "semantic": {"enabled": True, "min_similarity": DEFAULT_NOISE_FLOOR}},
+    # timeout_seconds: hard deadline per recall path; a hung backend degrades to partial results (see search.py)
+    # recall_budget: caps context injected per search response; 0 = unlimited (see tools.RecallBudget)
+    "search": {
+        "keyword": {"enabled": True},
+        "semantic": {"enabled": True, "min_similarity": DEFAULT_NOISE_FLOOR},
+        "timeout_seconds": 5,
+        "recall_budget": {"max_chars_per_trunk": 0, "max_total_chars": 0},
+    },
+    # Write-time conflict arbitration: after each add_memory, similar old memories are recalled
+    # and one LLM call decides keep/supersede/duplicate; only soft-archives, fully audited
+    # (arbitration_log). Degrades to no-op when no chat provider is configured. (see memory/arbitration.py)
+    "arbitration": {"enabled": True, "max_candidates": 5},
+    # Conversation capture: capture_conversation tool stores the raw log immediately and distills
+    # facts in the background (each with a source link). Off by default: costs one LLM call per capture.
+    "capture": {"enabled": False, "min_chars": 80, "max_facts": 10},
     "server": {"api_log_max": 1000},
     "profile": {
         "enabled": False,
@@ -71,6 +87,10 @@ DEFAULT_CONFIG = {
         "audit": {"batch_size": 20, "aging_days": 30},
         "dream": {
             "auto_run_on_trigger": False,
+            # auto_activate: replace the human review gate with the auditor gate — a candidate
+            # version auto-activates only when it has zero pending claims; otherwise it stays
+            # in review as before. Off by default (hard constraint 7.3 preserved by default).
+            "auto_activate": False,
             "min_interval_days": 7,
             "trigger": {"new_claims": 50, "pending_issues": 10},
         },
@@ -198,9 +218,17 @@ def build_services(config: dict):
         database.whoosh_search,
         semantic_enabled,
         config.get("search", {}).get("semantic", {}).get("min_similarity", DEFAULT_NOISE_FLOOR),
+        timeout_seconds=config.get("search", {}).get("timeout_seconds", 5),
     )
-    memory_tools = MemoryTools(sync_manager, search_engine)
+    memory_tools = MemoryTools(sync_manager, search_engine, config)
     auth_manager = AuthManager(database, config)
+
+    # Write-time conflict arbitration + conversation capture: both run through memory_tools'
+    # write path; both degrade to no-op / raw-log-only when no chat provider is available
+    arbitrator = WriteArbitrator(database, sync_manager, search_engine, config)
+    memory_tools.set_arbitrator(arbitrator)
+    capture_service = CaptureService(memory_tools, config)
+    memory_tools.set_capture_service(capture_service)
 
     # The demo is a public showcase: force anonymous access and reseed the library, since the
     # container keeps its data in tmpfs and starts empty on every boot.
@@ -240,6 +268,8 @@ def build_services(config: dict):
         "usage_tracker": usage_tracker,
         "profile_service": profile_service,
         "dream_manager": dream_manager,
+        "arbitrator": arbitrator,
+        "capture_service": capture_service,
     }
 
 
@@ -275,6 +305,8 @@ def create_app(config: dict, config_path: str, services: dict):
     from web.api_explore import init_explore_api, router as explore_router
     from web.api_profile import init_profile_api, router as profile_router
     from web.api_usage import init_usage_api, router as usage_router
+    from web.api_security import init_security_api, router as security_router
+    from web.scan_guard import ScanGuard, ScanGuardMiddleware
 
     init_api(services["sync_manager"], services["search_engine"], config, config_path,
              services["auth_manager"], services["memory_tools"])
@@ -298,6 +330,14 @@ def create_app(config: dict, config_path: str, services: dict):
 
     api_logger = services["api_logger"]
     demo_mode = is_demo_mode()
+
+    # On by default: an instance reachable from the internet is the case that needs it, and one
+    # reachable only on a LAN exempts its whole address range anyway, so it costs nothing there.
+    scan_guard = ScanGuard()
+    scan_guard_enabled = os.environ.get("ASTERMEM_SCAN_GUARD", "1").strip().lower() not in ("0", "false", "no")
+    # The security page reads this same instance: its counters only exist in the object the
+    # middleware is holding.
+    init_security_api(scan_guard, scan_guard_enabled)
 
     class APILogMiddleware(BaseHTTPMiddleware):
         """API call logging: provides data for /logs page, excludes streaming and self-referencing paths"""
@@ -390,10 +430,14 @@ def create_app(config: dict, config_path: str, services: dict):
     # reach any handler.
     if demo_mode:
         app.add_middleware(DemoReadOnlyMiddleware)
+    # Outermost of the three: a refused probe should cost nothing, not a log write.
+    if scan_guard_enabled:
+        app.add_middleware(ScanGuardMiddleware, guard=scan_guard)
     app.include_router(api_router)
     app.include_router(explore_router)
     app.include_router(profile_router)
     app.include_router(usage_router)
+    app.include_router(security_router)
 
     # User-uploaded images (data/images) are mounted separately to avoid SPA fallback
     images_dir = os.path.join(_abs(config.get("storage", {}).get("data_dir", "./data")), "images")
@@ -413,6 +457,13 @@ def create_app(config: dict, config_path: str, services: dict):
             # Prevent directory traversal: only allow real files within dist, everything else falls back to index.html
             if candidate.startswith(dist_dir) and os.path.isfile(candidate):
                 return FileResponse(candidate)
+            # A request for a file that is not here is answered as missing rather than with the app
+            # shell. Handing 200 and a full page to /secrets.json tells a scanner the path exists and
+            # is worth pursuing, and ScanGuard's rules can only name probes already known, so the
+            # gap reopens with every fashion in scanning. React Router's own paths never carry a file
+            # extension, which is what separates the two cases.
+            if "." in full_path.rsplit("/", 1)[-1]:
+                return Response(status_code=404)
             return FileResponse(os.path.join(dist_dir, "index.html"))
     else:
         @app.get("/")

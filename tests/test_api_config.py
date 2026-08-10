@@ -176,6 +176,40 @@ def test_agent_config_catalog_is_opt_in(client, api_token):
     assert "provider_catalog_ids" not in result
 
 
+def test_automation_toggles_roundtrip(client, app_bundle):
+    """
+    Settings page automation panel: GET exposes the three toggles, PUT flips them and the
+    live config dict (read by arbitrator / capture / dream at call time) reflects the change
+    immediately without restart.
+    """
+    _app, config, _path, _services = app_bundle
+    view = client.get("/api/config").json()
+    assert set(view["automation"]) == {
+        "arbitration_enabled", "capture_enabled", "dream_auto_activate"}
+
+    resp = client.put("/api/config", json={
+        "arbitration_enabled": True,
+        "capture_enabled": True,
+        "dream_auto_activate": True,
+    })
+    assert resp.status_code == 200, resp.text
+    view = client.get("/api/config").json()
+    assert view["automation"] == {
+        "arbitration_enabled": True, "capture_enabled": True, "dream_auto_activate": True}
+    # Live config dict updated in place — modules see it on their next call
+    assert config["capture"]["enabled"] is True
+    assert config["profile"]["dream"]["auto_activate"] is True
+
+    # Flip back so the shared app keeps arbitration/capture off for other tests
+    resp = client.put("/api/config", json={
+        "arbitration_enabled": False,
+        "capture_enabled": False,
+        "dream_auto_activate": False,
+    })
+    assert resp.status_code == 200
+    assert config["arbitration"]["enabled"] is False
+
+
 def test_agent_config_documented_paths_are_not_null(client, api_token):
     """
     Guards the key paths reference.md tells agents to read. A rename that leaves these resolving to

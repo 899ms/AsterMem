@@ -48,6 +48,8 @@ La distillation quotidienne ne voit que l'incrément du jour ; elle ne peut pas 
 
 Le choix de conception décisif : **la consolidation profonde ne prend jamais effet directement.** Elle produit une version candidate ; vous examinez le comparatif (ce qui a été ajouté, fusionné, retiré) puis vous l'adoptez ou la rejetez vous-même. La consolidation est déclenchée par les événements — assez de contenu nouveau accumulé, points en attente qui s'entassent, import massif terminé — et non par un cron rigide. On ne fait pas le grand ménage à date fixe ; on le fait quand le désordre se voit.
 
+La consolidation profonde a aussi un compagnon léger au quotidien : **le rangement à l'écriture**. À chaque nouvelle mémoire, le système la met en balance avec les mémoires similaires existantes — une décision dépassée est remplacée, un fait déjà consigné n'est pas stocké deux fois. Le rangement ne fait qu'archiver, jamais supprimer ; chaque décision est consignée avec son raisonnement dans le journal d'entretien, et tout ce qui a été archivé se restaure en un clic. Dans le doute, tout est conservé. Et si vous préférez une bibliothèque sans intervention, les résultats du rêve peuvent s'appliquer automatiquement — mais seulement quand chaque conclusion passe l'audit ; le moindre point douteux attend toujours votre décision.
+
 ## 7. Visible, modifiable, désactivable
 
 Un profil est le résumé que l'IA fait de vous — peut-être faux, peut-être partial. Le produit doit donc garantir trois choses :
@@ -65,5 +67,7 @@ AsterMem n'est pas un outil documentaire classique : c'est un **backend de mémo
 - Une API d'outils complète (recherche, lecture/écriture, profil) avec authentification par jeton Bearer et paliers de permissions lecture/écriture/destruction
 - Un paquet Skill prêt à l'emploi : Cursor, Claude Code et les autres agents l'installent et démarrent
 - `quick_match` renvoie en un seul appel le contexte temporel, les passages les plus pertinents et le guidage vers l'étape suivante — pensé pour l'ouverture de session
+- `capture_conversation` permet à l'agent de confier une conversation entière : le texte est conservé mot pour mot, et ce qui mérite d'être retenu est distillé en arrière-plan en mémoires indépendantes, chacune reliée à l'original — la sauvegarde ne dépend plus de la mémoire de l'agent
+- Les réponses de recherche obéissent à un budget de caractères et à une limite de temps stricte : quelle que soit la taille de la bibliothèque, elle ne bloque jamais le tour de l'agent
 
 Vous fournissez la matière. L'IA se souvient de qui vous êtes. C'est AsterMem.

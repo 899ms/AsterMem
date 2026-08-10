@@ -35,6 +35,8 @@ ALLOWED_WRITE_PATHS = frozenset({
 #:  - tokens are agent credentials, and agent is the read-write channel they unlock
 #:  - explore calls an LLM per request
 #:  - export builds a zip on disk first, which anonymous traffic would pile onto the tmpfs
+#:  - security reports this host's own defences, including the addresses configured never to be
+#:    blocked; a demo runs with sign-in off, so anything readable here is readable by anyone
 #: Reads that merely return empty results in a demo are not listed here: the visitor is meant to
 #: see those pages, and an empty log or a zeroed usage chart tells the truth about this instance.
 BLOCKED_READ_PREFIXES = (
@@ -42,6 +44,7 @@ BLOCKED_READ_PREFIXES = (
     "/api/explore/",
     "/api/agent/",
     "/api/export",
+    "/api/security",
 )
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})

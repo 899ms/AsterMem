@@ -9,7 +9,7 @@
     Key constraints:
       - Prefer the py launcher to pick 3.11 precisely, avoiding the Microsoft Store
         python.exe stub
-      - Whether to reinstall deps / rebuild frontend is decided by mtime marker files,
+      - Whether to reinstall deps / rebuild frontend is decided by mtime comparison,
         no network checks, so offline boot works
       - Missing node/npm only warns, doesn't block (backend still serves /api/agent/call)
       - Does not touch data\ or config.yaml: port, credentials, etc. are decided by
@@ -40,7 +40,7 @@ if ($Help) {
     Write-Host @"
 Usage: .\start.ps1 [options]        (or double-click start.bat)
 
-  -RebuildUi    Force rebuild the Web UI (use after changing web-ui\ source)
+  -RebuildUi    Force rebuild the Web UI (normally detected automatically from source mtimes)
   -SkipUi       Skip frontend check, start backend directly
   -Reinstall    Force reinstall Python dependencies
   -Help         Show this help
@@ -111,9 +111,26 @@ if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
     Write-Log "Generated .env from .env.example (fill in your API key and restart to enable semantic search)"
 }
 
+# A present dist\ says nothing about whether it matches the current source: editing web-ui\
+# and restarting used to silently keep serving the previous bundle. Compare source mtimes
+# against the built entry instead, so a rebuild is only skipped when it is genuinely current.
+function Test-UiStale {
+    if (-not (Test-Path $uiEntry)) { return $true }
+    $builtAt = (Get-Item $uiEntry).LastWriteTimeUtc
+    $uiDir = Join-Path $repoDir "web-ui"
+    $newer = Get-ChildItem -Path $uiDir -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.FullName -notmatch '\\(node_modules|dist)\\' -and
+            $_.Extension -ne ".tsbuildinfo" -and
+            $_.LastWriteTimeUtc -gt $builtAt
+        } |
+        Select-Object -First 1
+    return [bool]$newer
+}
+
 if ($SkipUi) {
     Write-Log "Skipped frontend check (-SkipUi)"
-} elseif ($RebuildUi -or -not (Test-Path $uiEntry)) {
+} elseif ($RebuildUi -or (Test-UiStale)) {
     if (Get-Command npm -ErrorAction SilentlyContinue) {
         Push-Location (Join-Path $repoDir "web-ui")
         try {
@@ -133,7 +150,7 @@ if ($SkipUi) {
         Write-Warn "After installing Node.js 18+, run .\start.ps1 -RebuildUi to build the frontend"
     }
 } else {
-    Write-Log "Web UI build is up to date (add -RebuildUi to force rebuild)"
+    Write-Log "Web UI build is up to date (newer than all web-ui\ sources)"
 }
 
 Write-Log "Starting AsterMem... (Ctrl+C to stop; default credentials: admin / admin)"

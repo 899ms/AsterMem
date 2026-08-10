@@ -1,0 +1,57 @@
+# Reference reverse proxy for a self-hosted AsterMem instance.
+#
+# Background: AsterMem serves its SPA from a catch-all that answers unknown paths with index.html.
+# A server block that is not the default_server leaves every other hostname -- and the bare IP
+# address -- on whatever nginx ships as its default site, which is where "the domain works but the
+# address returns 404" comes from.
+# Design intent: one block terminates TLS and is the default for :443, so the instance answers on
+# its address as well as its name. Port 80 never proxies, so a password cannot cross the network in
+# cleartext even when someone reaches the box by address and logs in.
+# Key constraints:
+#   - X-Real-IP and X-Forwarded-For must be set. The application's scanner defence works by
+#     address, and without them every caller appears to be 127.0.0.1, which is exempt: the defence
+#     would silently do nothing while looking configured.
+#   - Reaching the instance by address over TLS trips a certificate name warning, because the
+#     certificate is issued for the hostname. That is expected; the alternative is either serving
+#     logins in cleartext or leaving the address on a 404.
+#
+# Substitute mem.example.com and the certificate paths, then:
+#   ln -s /etc/nginx/sites-available/astermem /etc/nginx/sites-enabled/astermem
+#   rm -f /etc/nginx/sites-enabled/default
+#   nginx -t && systemctl reload nginx
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # $host rather than a fixed name: a request that arrived by address stays on that address and
+    # lands on the block below, instead of bouncing to a hostname the client never asked for.
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name mem.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/mem.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mem.example.com/privkey.pem;
+
+    # Library imports and exports are whole archives, not form posts.
+    client_max_body_size 50m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8768;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # AI exploration streams over SSE. The application sends X-Accel-Buffering: no, which is
+        # what actually stops nginx buffering it; this timeout only has to outlast one generation.
+        proxy_read_timeout 300s;
+    }
+}

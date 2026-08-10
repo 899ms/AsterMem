@@ -48,6 +48,8 @@ La destilación diaria solo ve el incremento de cada día; no puede detectar pat
 
 El diseño clave: **la consolidación profunda nunca entra en vigor directamente.** Produce una versión candidata; tú revisas el diff (qué se agregó, qué se fusionó, qué se eliminó) y la activas o la descartas manualmente. La consolidación se activa por eventos —suficiente contenido nuevo acumulado, cuestiones pendientes que se amontonan, una importación masiva terminada—, no por un cron rígido. La gente no hace limpieza a fondo con horario fijo; limpia cuando ve el desorden.
 
+La consolidación profunda tiene además un compañero ligero para el día a día: **el ordenado al escribir**. Cada vez que llega una memoria nueva, se sopesa frente a las memorias similares existentes: una decisión obsoleta queda reemplazada, un hecho ya registrado no se guarda dos veces. El ordenado solo archiva, nunca borra; cada decisión queda anotada con su razonamiento en el registro de mantenimiento, y todo lo archivado se recupera con un clic. Ante la duda, se conserva todo. Y si prefieres una biblioteca sin intervención, los resultados del sueño pueden aplicarse automáticamente — pero solo cuando cada conclusión supera la auditoría; cualquier punto dudoso sigue esperándote.
+
 ## 7. Visible, editable, desconectable
 
 Un perfil es el resumen que la IA hace de ti: puede estar equivocado, puede ser parcial. Por eso el producto debe garantizar tres cosas:
@@ -65,5 +67,7 @@ AsterMem no es una herramienta de documentos tradicional: es un **backend de mem
 - Una API de herramientas completa (búsqueda, lectura/escritura, perfil) con autenticación por token Bearer y niveles de permiso de lectura/escritura/destructivo
 - Un paquete Skill incluido: Cursor, Claude Code y otros agentes lo instalan y listo
 - `quick_match` devuelve en una sola llamada el contexto temporal + los pasajes más relevantes + la guía del siguiente paso, diseñado para la apertura de cada sesión
+- `capture_conversation` permite al agente entregar una conversación completa: el texto se guarda literal, y lo que merece recordarse a largo plazo se destila en segundo plano en memorias independientes, cada una enlazada al original — guardar ya no depende de que el agente se acuerde de guardar
+- Las respuestas de búsqueda operan bajo un presupuesto de caracteres y un límite de tiempo estricto: por grande que crezca la biblioteca, nunca detiene el turno del agente
 
 Tú aportas el material de memoria. La IA recuerda quién eres. Eso es AsterMem.

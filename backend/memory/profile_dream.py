@@ -201,6 +201,20 @@ class DreamManager:
                     "usage_tokens = ?, ended_at = ? WHERE id = ?",
                     (new_vid, usage, _now(), dream_id),
                 )
+
+            # Optional unattended mode (dream.auto_activate, off by default): replaces the
+            # human gate with the auditor gate. A candidate auto-activates ONLY when it is
+            # fully clean — every claim already passed the two-step audit and none is in a
+            # pending state. Any flagged conflict/unsupported claim keeps the candidate in
+            # 'review' for the human, exactly as before. Full version history + one-click
+            # rollback (activate an archived version) still applies.
+            if self._cfg().get("auto_activate"):
+                try:
+                    self._try_auto_activate(new_vid)
+                except Exception as e:
+                    # The Dream itself succeeded; a gate failure only means the candidate
+                    # stays in review for the human, never that the Dream failed
+                    print(f"[WARN] Dream auto-activate failed, candidate left in review: {e}")
         except Exception as e:
             print(f"[WARN] Dream {dream_id} failed: {e}")
             with self.db.get_connection() as conn:
@@ -451,6 +465,29 @@ class DreamManager:
                 (status, _now(), *claim_ids),
             )
 
+    def _try_auto_activate(self, version_id: int) -> bool:
+        """Auditor-gated auto activation: only a candidate with zero pending claims goes live."""
+        placeholders = ",".join("?" for _ in ProfileAuditor.PENDING_STATUSES)
+        with self.db.get_connection() as conn:
+            pending = conn.execute(
+                f"SELECT COUNT(*) AS n FROM profile_claims "
+                f"WHERE version_id = ? AND status IN ({placeholders})",
+                (version_id, *ProfileAuditor.PENDING_STATUSES),
+            ).fetchone()["n"]
+        if pending > 0:
+            self.auditor._log(
+                "dream_auto_activate_skipped", f"version#{version_id}",
+                f"{pending} pending claim(s) require human review")
+            print(f"[dream] Auto-activate skipped for version#{version_id}: "
+                  f"{pending} pending claim(s) left in review")
+            return False
+        activated = self.activate_version(version_id, actor="auto")
+        if activated:
+            self.auditor._log("dream_auto_activate", f"version#{version_id}",
+                              "Candidate passed auditor gate, auto-activated")
+            print(f"[dream] Candidate version#{version_id} auto-activated (auditor gate passed)")
+        return activated
+
     # ---------- Candidate version: diff / activate / discard ----------
 
     def diff(self, version_id: int) -> dict:
@@ -482,7 +519,7 @@ class DreamManager:
                 "added": added, "removed": removed, "modified": modified,
                 "unchanged_count": len(unchanged)}
 
-    def activate_version(self, version_id: int) -> bool:
+    def activate_version(self, version_id: int, actor: str = "user") -> bool:
         with self.db.get_connection() as conn:
             row = conn.execute(
                 "SELECT status FROM profile_versions WHERE id = ?", (version_id,)
@@ -499,7 +536,9 @@ class DreamManager:
                 "UPDATE profile_dreams SET status = 'applied' WHERE output_version_id = ?",
                 (version_id,),
             )
-        self.auditor._log("dream_activate", f"version#{version_id}", "User activated candidate version")
+        detail = ("User activated candidate version" if actor == "user"
+                  else "Auto-activated after auditor gate")
+        self.auditor._log("dream_activate", f"version#{version_id}", detail)
         return True
 
     def discard_version(self, version_id: int) -> bool:

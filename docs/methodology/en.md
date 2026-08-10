@@ -48,6 +48,8 @@ Daily distillation only sees each day's increment; it can't spot patterns spanni
 
 The key design: **deep consolidation never takes effect directly.** It produces a candidate version; you review the diff (what was added, merged, removed) and activate or discard it manually. Consolidation is event-driven — enough new content accumulated, pending issues piling up, a bulk import finished — not a rigid cron job. People don't deep-clean on a fixed schedule; they clean when things look messy.
 
+Deep consolidation also has a lightweight everyday counterpart: **write-time tidying**. Whenever a new memory arrives, it is weighed against similar older ones — an outdated decision gets superseded, a fact already on record isn't stored twice. Tidying only ever archives, never deletes; every decision lands in the upkeep trail with its reasoning, and anything archived is one click from coming back. When in doubt, everything is kept. And if you prefer a hands-off library, dream results can apply automatically — but only when every conclusion passes the auditor; anything questionable still waits for you.
+
 ## 7. Visible, Editable, Switchable
 
 A profile is the AI's summary of you — possibly wrong, possibly one-sided. So the product must guarantee three things:
@@ -65,5 +67,7 @@ AsterMem isn't a traditional document tool — it's a **memory backend for agent
 - A complete tool API (search, read/write, profile) with Bearer token auth and read/write/destructive permission tiers
 - A bundled Skill package: Cursor, Claude Code, and other agents install and go
 - `quick_match` returns time context + the most relevant passages + next-step guidance in one call, designed for session openings
+- `capture_conversation` lets an agent hand over a whole conversation: the text is kept verbatim, and the parts worth remembering are distilled into memories in the background, each linked back to the original — saving no longer depends on the agent remembering to save
+- Retrieval replies run under a character budget and a hard time limit: however large the library grows, it never stalls an agent's turn
 
 You provide the memory material. AI remembers who you are. That's AsterMem.

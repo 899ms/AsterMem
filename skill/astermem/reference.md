@@ -38,12 +38,13 @@ Do not assume a single search is complete: one query usually covers one angle. J
 
 | Tool | Arguments | Notes |
 |---|---|---|
-| `add_memory` | `title`, `content`, `tags` (list), `priority` (5) | Content is Markdown. Auto-chunked into trunks in background. |
+| `add_memory` | `title`, `content`, `tags` (list), `priority` (5) | Content is Markdown. Auto-chunked into trunks in background. If a chat provider is configured, a background arbitration pass compares the new memory against similar existing ones and may soft-archive an outdated or duplicated one (decisions are audited at `GET /api/arbitration/logs`, always reversible). |
 | `update_memory` | `memory_id`, then any of `title`/`content`/`tags`/`priority`/`status` | Omitted fields unchanged. Bumps version. |
 | `patch_memory` | `memory_id`, `old_text`, `new_text` | Exact unique-match replacement inside document. Fails if `old_text` not found or ambiguous. |
 | `patch_trunk` | `trunk_id`, `old_text`, `new_text` | Same, scoped to one paragraph. |
 | `update_trunk` | `trunk_id`, `content`/`summary`/`tags` | Whole-paragraph update. |
 | `delete_memory` | `memory_id` | Soft delete (status → archived). Restore via `update_memory status=active`. |
+| `capture_conversation` | `content`, `session` (optional) | Stores the conversation text verbatim right away (tag `capture/raw`), then a background LLM pass distills facts worth keeping into separate memories (tag `capture/distilled`), each linking back to the raw log. Requires `capture.enabled: true` in server config (off by default — costs one LLM call per capture). |
 
 ### Configuration
 

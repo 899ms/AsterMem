@@ -44,6 +44,52 @@ _EMBEDDING_MAX_RETRIES = 3
 _RETRYABLE_STATUS = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 _MAX_RETRY_WAIT = 30.0
 
+# Embedding endpoints refuse an input they cannot tokenise, and both ends of the range bite: an
+# empty string is rejected outright, and one past the context window fails with a 400 that no
+# amount of retrying will clear. Either way the caller ends up with a memory that is stored, looks
+# indexed, and can never be found by semantic search. The input is brought into range before it is
+# sent rather than after the upstream objects.
+#
+# The window is counted in tokens, so a character budget only works if it cannot exceed the token
+# budget under the densest script. Measured against text-embedding-v4: CJK costs ~0.7 tokens per
+# character and ASCII ~0.2, so spending one character per allowed token leaves headroom even for a
+# tokeniser less efficient than the ones observed.
+_EMBEDDING_MAX_CHARS = 8000  # OpenAI-compatible endpoints converge on an 8192-token window
+_GEMINI_MAX_CHARS = 2000  # Google's embedding models accept 2048
+
+
+def _fit_embedding_input(text: str, max_chars: int) -> str:
+    """
+    Bring one input inside what an embedding endpoint will accept.
+
+    Truncating loses the tail of an oversized text, which costs recall on that one item. That is the
+    lesser harm: the alternative is no vector at all, which drops the item out of semantic search
+    completely while every count upstream still reports it as indexed.
+    """
+    if not text or not text.strip():
+        # A blank input is refused, while a single space embeds fine and keeps the id in the store.
+        # The local adapter already does this to the blank trunks callers pass through.
+        return " "
+    if len(text) <= max_chars:
+        return text
+    print(f"[providers] embedding input truncated to {max_chars} of {len(text)} characters")
+    return text[:max_chars]
+
+
+def _upstream_detail(error: Exception) -> str:
+    """
+    Describe a failed request in terms of what the upstream actually said.
+
+    httpx renders a status error as "Client error '400 Bad Request' for url ...", naming neither the
+    field objected to nor the limit exceeded. The reply body is the only place that reason exists,
+    and without it a permanent failure reads exactly like a transient one in the logs.
+    """
+    if isinstance(error, httpx.HTTPStatusError):
+        body = error.response.text.strip()
+        if body:
+            return f"{error} - {body[:500]}"
+    return str(error)
+
 
 # ==================== Usage parsing (unified gateway observation point) ====================
 # The three protocols have different usage field structures; centralized here to parse into
@@ -546,7 +592,12 @@ class OpenAICompatibleEmbedding(EmbeddingModel):
     def _request_embeddings(self, client: httpx.Client, payload_input: Union[str, List[str]],
                            caller: str) -> dict:
         """POST /embeddings, backing off on rate limits and other transient upstream failures."""
-        texts = [payload_input] if isinstance(payload_input, str) else payload_input
+        was_single = isinstance(payload_input, str)
+        texts = [_fit_embedding_input(t, _EMBEDDING_MAX_CHARS)
+                 for t in ([payload_input] if was_single else payload_input)]
+        # One oversized item fails the whole request, so a batch would lose the vectors of every
+        # other item travelling with it, not just its own.
+        payload_input = texts[0] if was_single else texts
         last_error: Optional[Exception] = None
         start = time.time()
         for attempt in range(_EMBEDDING_MAX_RETRIES):
@@ -574,7 +625,7 @@ class OpenAICompatibleEmbedding(EmbeddingModel):
                       f"({attempt + 1}/{_EMBEDDING_MAX_RETRIES}): {e}")
                 time.sleep(wait)
         self._record(0, int((time.time() - start) * 1000), caller,
-                     status="error", error=str(last_error))
+                     status="error", error=_upstream_detail(last_error))
         raise last_error
 
     def embed(self, text: str, caller: str = "embedding") -> List[float]:
@@ -583,7 +634,8 @@ class OpenAICompatibleEmbedding(EmbeddingModel):
                 data = self._request_embeddings(client, text, caller)
                 return data["data"][0]["embedding"]
         except Exception as e:
-            raise ConnectionError(f"{self.provider_name} embedding request failed: {e}")
+            raise ConnectionError(
+                f"{self.provider_name} embedding request failed: {_upstream_detail(e)}")
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         results: List[List[float]] = []
@@ -596,7 +648,8 @@ class OpenAICompatibleEmbedding(EmbeddingModel):
                     results.extend([it["embedding"] for it in items])
             return results
         except Exception as e:
-            raise ConnectionError(f"{self.provider_name} batch embedding failed: {e}")
+            raise ConnectionError(
+                f"{self.provider_name} batch embedding failed: {_upstream_detail(e)}")
 
     def is_available(self, max_retries: int = 3) -> bool:
         """
@@ -647,6 +700,7 @@ class GeminiEmbedding(EmbeddingModel):
     def embed(self, text: str, caller: str = "embedding") -> List[float]:
         if not self.api_key:
             raise ValueError(f"{self.provider_name}: API key not configured")
+        text = _fit_embedding_input(text, _GEMINI_MAX_CHARS)
         last_error: Optional[Exception] = None
         start = time.time()
         for attempt in range(_EMBEDDING_MAX_RETRIES):
@@ -675,8 +729,9 @@ class GeminiEmbedding(EmbeddingModel):
         record_usage(caller=caller, kind="embedding", model=self.model,
                      provider=self.provider_id, provider_name=self.provider_name,
                      duration_ms=int((time.time() - start) * 1000),
-                     status="error", error=str(last_error))
-        raise ConnectionError(f"{self.provider_name} embedding request failed: {last_error}")
+                     status="error", error=_upstream_detail(last_error))
+        raise ConnectionError(
+            f"{self.provider_name} embedding request failed: {_upstream_detail(last_error)}")
 
     def is_available(self) -> bool:
         return bool(self.api_key)
